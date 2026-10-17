@@ -130,8 +130,6 @@ public class PushTokenService : IPushTokenService
                 .Where(t => tokens.Contains(t.Token))
                 .ExecuteDeleteAsync();
             
-            await _context.SaveChangesAsync();
-            
             return Result.Success();
         }
         catch (Exception ex)
@@ -145,7 +143,7 @@ public class PushTokenService : IPushTokenService
     {
         if (string.IsNullOrWhiteSpace(token) || token.Length > 512 || string.IsNullOrWhiteSpace(platform) || platform.Length > 50)
         {
-            return Result<Unit, Error>.Failure(Error.Failure("PushToken.Empty", "Push token cannot be empty."));
+            return Result<Unit, Error>.Failure(Error.Validation("PushToken.Invalid", "Token and platform are required and must not exceed 512 and 50 characters respectively."));
         }
         
         if (!await _context.UserSessions.AnyAsync(s => s.Id == sessionId && s.UserId == userId &&

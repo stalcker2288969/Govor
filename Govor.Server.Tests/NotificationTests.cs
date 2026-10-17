@@ -75,7 +75,7 @@ public class NotificationTests
         Assert.That(_events.Single(e => e.Method == ChatHubConstants.MessageSent).Groups,
             Is.EqualTo(new[] { ChatHubConstants.GetSessionGroup(_aliceSession) }));
         _push.Verify(p => p.SendToUsersAsync(It.Is<IEnumerable<Guid>>(ids => ids.SequenceEqual(new[] { _db.Bob })),
-            "Alice", "hello", "chat_messages", $"chat_{_db.ChatId}",
+            "Alice", "New message", "chat_messages", $"chat_{_db.ChatId}",
             It.Is<Dictionary<string, string>?>(data => data != null && data["messageId"] == message.MessageId.ToString())), Times.Once);
     }
 
@@ -97,6 +97,34 @@ public class NotificationTests
         _push.Verify(p => p.SendToUsersAsync(It.Is<IEnumerable<Guid>>(ids => ids.SequenceEqual(new[] { _db.Bob })),
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<Dictionary<string, string>?>()), Times.Once);
+    }
+
+    [Test]
+    public async Task MessageReadBeforeRetrySuppressesPush()
+    {
+        var saved = _db.AddMessage();
+        _db.Context.MessageViews.Add(new MessageView
+        { Id = Guid.NewGuid(), MessageId = saved.Id, UserId = _db.Bob, ViewedAt = DateTime.UtcNow });
+        await _db.Context.SaveChangesAsync();
+        var message = Message();
+        message.MessageId = saved.Id;
+
+        Assert.That(await _notifier.DeliverPushAsync(message), Is.True);
+        _push.Verify(p => p.SendToUsersAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Dictionary<string, string>?>()), Times.Never);
+    }
+
+    [Test]
+    public async Task PushDoesNotExposeContentAndKeepsRoutingData()
+    {
+        var message = Message();
+        message.EncryptedContent = "sensitive plaintext or ciphertext";
+        Assert.That(await _notifier.DeliverPushAsync(message), Is.True);
+        _push.Verify(p => p.SendToUsersAsync(It.IsAny<IEnumerable<Guid>>(), "Alice", "New message",
+            "chat_messages", $"chat_{_db.ChatId}", It.Is<Dictionary<string, string>?>(data => data != null &&
+                data["type"] == "chat_message" && data["senderId"] == _db.Alice.ToString() &&
+                data["chatId"] == _db.ChatId.ToString() && data["isGroup"] == "false" &&
+                data["messageId"] == message.MessageId.ToString() && !data.Values.Contains(message.EncryptedContent))), Times.Once);
     }
 
     [Test]

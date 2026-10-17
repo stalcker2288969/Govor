@@ -5,7 +5,6 @@ using Govor.API.Common.Extensions;
 using Govor.API.Hubs;
 using Govor.Application.Authentication.JWT;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Govor.Domain;
@@ -201,10 +200,10 @@ app.MapGet("/server/ready", async (GovorDbContext db, CancellationToken cancella
     }
 });
 
-app.MapHub<ChatsHub>("/hubs/chats", options => options.CloseOnAuthenticationExpiration = true);
-app.MapHub<FriendsHub>("/hubs/friends", options => options.CloseOnAuthenticationExpiration = true);
-app.MapHub<ProfileHub>("/hubs/profiles", options => options.CloseOnAuthenticationExpiration = true);
-app.MapHub<PresenceHub>("/hubs/presence", options => options.CloseOnAuthenticationExpiration = true);
+app.MapHub<ChatsHub>("/hubs/chats");
+app.MapHub<FriendsHub>("/hubs/friends");
+app.MapHub<ProfileHub>("/hubs/profiles");
+app.MapHub<PresenceHub>("/hubs/presence");
 
 app.MapSwagger()
     .RequireAuthorization();

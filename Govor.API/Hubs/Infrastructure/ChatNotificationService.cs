@@ -67,12 +67,14 @@ public class ChatNotificationService : IChatNotificationService
                 return true;
             var profile = await _profiles.GetUserProfileAsync(message.SenderId);
             var title = profile.IsSuccess ? profile.Value.Username : "Govor";
-            var content = message.EncryptedContent ?? string.Empty;
-            var body = content.Length == 0 ? "Attachment" : content[..Math.Min(40, content.Length)];
+            // Message content is encrypted; never send ciphertext or a guessed preview to FCM.
+            var body = "New message";
             var data = new Dictionary<string, string>
             {
                 ["chatId"] = message.RecipientId.ToString(),
                 ["messageId"] = message.MessageId.ToString(),
+                ["senderId"] = message.SenderId.ToString(),
+                ["type"] = "chat_message",
                 ["isGroup"] = message.RecipientType == RecipientType.Group ? "true" : "false"
             };
             var push = await _notificationService.SendToUsersAsync(recipients, title, body,

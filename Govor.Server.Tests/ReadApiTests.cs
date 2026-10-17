@@ -87,6 +87,43 @@ public class ReadApiTests
     }
 
     [Test]
+    public async Task PushRegistrationRotationAndUnregisterAffectOnlyTheAuthenticatedSession()
+    {
+        var otherSession = new UserSession { UserId = _db.Bob, ExpiresAt = DateTime.UtcNow.AddDays(1), RefreshTokenHash = "other-device" };
+        _db.Context.UserSessions.Add(otherSession);
+        _db.Context.UserPushTokens.Add(new UserPushToken
+        { UserId = _db.Bob, UserSessionId = otherSession.Id, Token = "other-device", Platform = "android" });
+        await _db.Context.SaveChangesAsync();
+        Assert.That((await _client.DeleteAsync("/api/pushes/token")).StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Authorize();
+        foreach (var token in new[] { "original", "rotated" })
+            Assert.That((await _client.PostAsJsonAsync("/api/pushes/token/register", new { token, platform = "android" })).StatusCode,
+                Is.EqualTo(HttpStatusCode.NoContent));
+        var registered = await _db.Context.UserPushTokens.AsNoTracking().SingleAsync(t => t.UserSessionId == _session);
+        Assert.That(registered.Token, Is.EqualTo("rotated"));
+        foreach (var _ in Enumerable.Range(0, 2))
+            Assert.That((await _client.DeleteAsync("/api/pushes/token")).StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+        Assert.That((await _db.Context.UserPushTokens.AsNoTracking().SingleAsync(t => t.UserSessionId == _session)).IsActive, Is.False);
+        Assert.That((await _db.Context.UserPushTokens.AsNoTracking().SingleAsync(t => t.UserSessionId == otherSession.Id)).IsActive, Is.True);
+        Assert.That((await _client.PostAsJsonAsync("/api/pushes/token/register", new { token = "rotated", platform = "android" })).StatusCode,
+            Is.EqualTo(HttpStatusCode.NoContent));
+        Assert.That((await _db.Context.UserPushTokens.AsNoTracking().SingleAsync(t => t.UserSessionId == _session)).IsActive, Is.True);
+    }
+
+    [TestCase(null, "android")]
+    [TestCase("", "android")]
+    [TestCase("   ", "android")]
+    [TestCase("token", " ")]
+    [TestCase("token", null)]
+    public async Task PushRegistrationRejectsMissingOrBlankFields(string? token, string? platform)
+    {
+        Authorize();
+        Assert.That((await _client.PostAsJsonAsync("/api/pushes/token/register", new { token, platform })).StatusCode,
+            Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(await _db.Context.UserPushTokens.CountAsync(), Is.Zero);
+    }
+
+    [Test]
     public async Task AnonymousAndRefreshTokenCannotUseReadApi()
     {
         var path = $"/api/chats/{_db.ChatId}/unread-count?recipientType=0";

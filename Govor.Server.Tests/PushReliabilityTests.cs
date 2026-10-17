@@ -112,6 +112,56 @@ public class PushReliabilityTests
         Assert.That(forbidden.Error.Type, Is.EqualTo(ErrorType.Forbidden));
     }
 
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task ExpiredWorkerCannotDeleteOrRescheduleANewerLease(bool delivered)
+    {
+        var message = _db.AddMessage();
+        _db.Context.ChatPushNotifications.Add(new Govor.Domain.Models.Messages.ChatPushNotification
+        { MessageId = message.Id, NextAttemptAt = _now });
+        await _db.Context.SaveChangesAsync();
+        var notifier = new Mock<IChatNotificationService>();
+        var secondWorker = new Mock<IChatNotificationService>();
+        secondWorker.Setup(n => n.DeliverPushAsync(It.IsAny<UserMessageResponse>())).ReturnsAsync(false);
+        DateTime retryAt = default;
+        notifier.Setup(n => n.DeliverPushAsync(It.IsAny<UserMessageResponse>())).Returns(async () =>
+        {
+            _now = _now.AddMinutes(3);
+            using var otherContext = _db.CreateContext();
+            await new ChatPushDispatcher(otherContext, secondWorker.Object, _clock.Object).DispatchAsync();
+            retryAt = (await otherContext.ChatPushNotifications.AsNoTracking().SingleAsync()).NextAttemptAt;
+            _now = _now.AddSeconds(1);
+            return delivered;
+        });
+
+        await new ChatPushDispatcher(_db.Context, notifier.Object, _clock.Object).DispatchAsync();
+
+        var pending = await _db.Context.ChatPushNotifications.AsNoTracking().SingleAsync();
+        Assert.That(pending.Attempts, Is.EqualTo(2));
+        Assert.That(pending.NextAttemptAt, Is.EqualTo(retryAt));
+    }
+
+    [Test]
+    public async Task NotificationExceptionDoesNotBlockRemainingMessagesInBatch()
+    {
+        foreach (var _ in Enumerable.Range(0, 2))
+        {
+            var message = _db.AddMessage();
+            _db.Context.ChatPushNotifications.Add(new Govor.Domain.Models.Messages.ChatPushNotification
+            { MessageId = message.Id, NextAttemptAt = _now });
+        }
+        await _db.Context.SaveChangesAsync();
+        var notifier = new Mock<IChatNotificationService>();
+        notifier.SetupSequence(n => n.DeliverPushAsync(It.IsAny<UserMessageResponse>()))
+            .ThrowsAsync(new HttpRequestException("offline")).ReturnsAsync(true);
+
+        await new ChatPushDispatcher(_db.Context, notifier.Object, _clock.Object).DispatchAsync();
+
+        notifier.Verify(n => n.DeliverPushAsync(It.IsAny<UserMessageResponse>()), Times.Exactly(2));
+        var pending = await _db.Context.ChatPushNotifications.AsNoTracking().SingleAsync();
+        Assert.That(pending.NextAttemptAt, Is.EqualTo(_now.AddSeconds(2)));
+    }
+
     private Guid AddSession(Guid user)
     {
         var session = new UserSession { UserId = user, ExpiresAt = _now.AddDays(1), RefreshTokenHash = Guid.NewGuid().ToString() };

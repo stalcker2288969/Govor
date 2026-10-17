@@ -15,7 +15,9 @@ public class MessageReadingService : IMessageReadingService
     private readonly ILogger<MessageReadingService> _logger;
     private readonly INowDateTimeProvider _dateTimeProvider;
 
-    public MessageReadingService(GovorDbContext dbContext, ILogger<MessageReadingService> logger,
+    public MessageReadingService(
+        GovorDbContext dbContext,
+        ILogger<MessageReadingService> logger,
         INowDateTimeProvider dateTimeProvider)
     {
         _dbContext = dbContext;

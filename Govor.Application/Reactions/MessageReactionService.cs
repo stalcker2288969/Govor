@@ -34,10 +34,14 @@ public class MessageReactionService(GovorDbContext context, INowDateTimeProvider
     {
         if (reactionId == Guid.Empty)
             return Result.Failure<MessageReactionState>(Error.Validation("Reaction.InvalidId", "A reaction ID is required."));
+        
         var message = await context.Messages.AsNoTracking().FirstOrDefaultAsync(m => m.Id == messageId);
+        
         if (message is null) return Result.Failure<MessageReactionState>(Missing());
+        
         if (!await context.HasChatAccessAsync(userId, message.RecipientId, message.RecipientType))
             return Result.Failure<MessageReactionState>(Denied());
+        
         return await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
             await using var transaction = await context.Database.BeginTransactionAsync();
@@ -45,9 +49,11 @@ public class MessageReactionService(GovorDbContext context, INowDateTimeProvider
                 // Same lock order as channel policy changes; serialize reaction decisions with policy writes.
                 await context.ChatGroups.Where(g => g.Id == message.RecipientId)
                     .ExecuteUpdateAsync(s => s.SetProperty(g => g.ReactionMode, g => g.ReactionMode));
+           
             if (await context.Messages.Where(m => m.Id == messageId)
                     .ExecuteUpdateAsync(s => s.SetProperty(m => m.ReactionsVersion, m => m.ReactionsVersion)) == 0)
                 return Result.Failure<MessageReactionState>(Missing());
+            
             if (!await context.HasChatAccessAsync(userId, message.RecipientId, message.RecipientType))
                 return Result.Failure<MessageReactionState>(Denied());
 
@@ -56,10 +62,13 @@ public class MessageReactionService(GovorDbContext context, INowDateTimeProvider
             {
                 item = await context.ReactionItems.AsNoTracking()
                     .FirstOrDefaultAsync(r => r.Id == reactionId && r.IsEnabled && r.Pack.IsEnabled);
-                if (item is null) return Result.Failure<MessageReactionState>(Error.NotFound("Reaction.NotAvailable", "Reaction is not available."));
+                if (item is null)
+                    return Result.Failure<MessageReactionState>(Error.NotFound("Reaction.NotAvailable", "Reaction is not available."));
+                
                 var channel = message.RecipientType == RecipientType.Group
                     ? await context.ChatGroups.AsNoTracking().FirstOrDefaultAsync(g => g.Id == message.RecipientId && g.IsChannel)
                     : null;
+                
                 if (channel is not null && (channel.ReactionMode == ChannelReactionMode.None ||
                     (channel.ReactionMode == ChannelReactionMode.Selected && !await context.ChannelAllowedReactions
                         .AnyAsync(r => r.GroupId == channel.Id && r.ReactionId == item.Id))))
@@ -82,7 +91,9 @@ public class MessageReactionService(GovorDbContext context, INowDateTimeProvider
                     .ExecuteUpdateAsync(s => s.SetProperty(m => m.ReactionsVersion, m => m.ReactionsVersion + 1));
             }
             var state = (await StateAsync(messageId, userId))! with { Changed = changed };
+            
             await transaction.CommitAsync();
+            
             return Result.Success(state);
         });
     }
@@ -105,6 +116,7 @@ public class MessageReactionService(GovorDbContext context, INowDateTimeProvider
     {
         if (!await context.HasChatAccessAsync(userId, groupId, RecipientType.Group))
             return Result.Failure<ChannelReactionPolicy>(Denied());
+        
         return await context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
             await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);

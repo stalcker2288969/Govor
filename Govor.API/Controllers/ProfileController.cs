@@ -112,7 +112,7 @@ public class ProfileController : ControllerBase
     }
 
     [HttpGet("download/{id}")]
-    public async Task<IActionResult> DowloadProfileByUserId(Guid id)
+    public async Task<IActionResult> DownloadProfileByUserId(Guid id)
     {
         try
         {

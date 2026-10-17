@@ -15,15 +15,18 @@ public class PushTokensController : Controller
     private readonly ICurrentUserService _currentUser;
     private readonly ICurrentUserSessionService _currentSession;
     private readonly IPushTokenService _pushTokenService;
+    private readonly ILogger<PushTokensController> _logger;
 
     public PushTokensController(
         IPushTokenService  pushTokenService,
         ICurrentUserService currentUser,
-        ICurrentUserSessionService currentSession)
+        ICurrentUserSessionService currentSession,
+        ILogger<PushTokensController> logger)
     {
         _pushTokenService = pushTokenService;
         _currentUser = currentUser;
         _currentSession = currentSession;
+        _logger = logger;
     }
 
     [HttpPost("pushes/token/register")]
@@ -31,30 +34,22 @@ public class PushTokensController : Controller
     {
         try
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            if (string.IsNullOrEmpty(req.Token) || string.IsNullOrWhiteSpace(req.Platform))
-                return BadRequest(ModelState);
-
-            var currentId = _currentUser.GetCurrentUserId();
-            var currentSessionId = _currentSession.GetUserSessionId();
-
-           var result = await _pushTokenService.AddOrUpdateTokenAsync(
-                userId: currentId,
-                sessionId: currentSessionId,
-                token: req.Token,
-                platform: req.Platform);
-
-           return result.ToActionResult();
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ex.Message);
+            var result = await _pushTokenService.AddOrUpdateTokenAsync(
+                _currentUser.GetCurrentUserId(), _currentSession.GetUserSessionId(), req.Token, req.Platform);
+            return result.ToActionResult();
         }
         catch (Exception ex)
         {
-            return StatusCode(500, "Unexpected Error! Please try again later.");
+            _logger.LogError(ex, "Failed to register push token for the current session");
+            return Problem(statusCode: StatusCodes.Status500InternalServerError,
+                detail: "Push token registration failed. Please try again later.");
         }
+    }
+
+    [HttpDelete("pushes/token")]
+    public async Task<IActionResult> UnregisterToken()
+    {
+        var result = await _pushTokenService.DeactivateTokenBySessionAsync(_currentSession.GetUserSessionId());
+        return result.ToActionResult();
     }
 }

@@ -13,20 +13,34 @@ namespace Govor.API.Controllers;
 [ApiController]
 [Authorize(Roles = "Admin,User")]
 [Route("api/groups/{groupId:guid}/reactions")]
-public class ChannelReactionsController(IMessageReactionService reactions, ICurrentUserService currentUser,
-    IMapper mapper, IChatNotificationService notifier) : ControllerBase
+public class ChannelReactionsController(
+    IMessageReactionService reactions,
+    ICurrentUserService currentUser,
+    IMapper mapper,
+    IChatNotificationService notifier) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> Get(Guid groupId) => (await reactions.GetPolicyAsync(currentUser.GetCurrentUserId(), groupId))
-        .Map(p => mapper.Map<ChannelReactionPolicyResponse>(p)).ToActionResult();
+    public async Task<IActionResult> Get(Guid groupId) => 
+        (await reactions.GetPolicyAsync(currentUser.GetCurrentUserId(), groupId))
+        .Map(p => mapper.Map<ChannelReactionPolicyResponse>(p))
+        .ToActionResult();
 
     [HttpPut]
     public async Task<IActionResult> Set(Guid groupId, [FromBody] ChannelReactionPolicyRequest request)
     {
-        var result = await reactions.SetPolicyAsync(currentUser.GetCurrentUserId(), groupId, request.Mode, request.ReactionIds);
-        if (result.IsFailure) return result.ToActionResult();
+        var result = await reactions.SetPolicyAsync(
+            currentUser.GetCurrentUserId(),
+            groupId,
+            request.Mode,
+            request.ReactionIds);
+       
+        if (result.IsFailure) 
+            return result.ToActionResult();
+        
         var response = mapper.Map<ChannelReactionPolicyResponse>(result.Value);
+        
         await notifier.NotifyChannelReactionPolicyChangedAsync(response);
+        
         return Ok(response);
     }
 }

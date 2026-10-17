@@ -1,5 +1,4 @@
 using FirebaseAdmin.Messaging;
-using Govor.Application.Interfaces.PushNotifications;
 using Govor.Application.Interfaces.PushNotifications.Models;
 using Microsoft.Extensions.Logging;
 
@@ -8,9 +7,11 @@ namespace Govor.Application.PushNotifications.Providers;
 public class FirebasePushProvider : IPushNotificationProvider
 {
     private readonly ILogger<FirebasePushProvider> _logger;
-    public FirebasePushProvider(ILogger<FirebasePushProvider> logger)
+    private readonly FirebaseMessaging? _messaging;
+    public FirebasePushProvider(ILogger<FirebasePushProvider> logger, FirebaseMessaging? messaging = null)
     {
         _logger = logger;
+        _messaging = messaging;
     }
     
     public string Name => "FCM";
@@ -21,14 +22,14 @@ public class FirebasePushProvider : IPushNotificationProvider
 
         try
         {
-            string response = await FirebaseMessaging.DefaultInstance.SendAsync(msg);
+            await (_messaging ?? FirebaseMessaging.DefaultInstance).SendAsync(msg);
             return new SendPushResult(1, 0, []);
         }
         catch (FirebaseMessagingException ex)
         {
             if (IsInvalidTokenError(ex))
             {
-                _logger.LogError(ex, "FCM send failed");
+                _logger.LogInformation("FCM registration is no longer valid");
                 return new SendPushResult(0, 1,  [token]);
             }
 
@@ -38,6 +39,7 @@ public class FirebasePushProvider : IPushNotificationProvider
 
     public async Task<SendPushResult> SendMulticastAsync(IReadOnlyList<string> tokens, PushMessage message)
     {
+        tokens = tokens.Distinct().ToArray();
         if (tokens.Count == 0)
             return new SendPushResult(0, 0, []);
 
@@ -65,20 +67,14 @@ public class FirebasePushProvider : IPushNotificationProvider
                 Body  = message.Body,
             },
             Data = message.Data,
-            Android = message.ChannelId != null ? new AndroidConfig
-            {
-                Priority = Priority.High,
-                Notification = new AndroidNotification
-                {
-                    ChannelId = message.ChannelId ?? "chat_messages",
-                    Tag = message.Tag,
-                }
-            } : null
+            Android = BuildAndroidConfig(message),
+            Apns = BuildApnsConfig(message),
+            Webpush = BuildWebpushConfig(message)
         };
 
         try
         {
-            var response = await FirebaseMessaging.DefaultInstance.SendEachForMulticastAsync(multicastMsg);
+            var response = await (_messaging ?? FirebaseMessaging.DefaultInstance).SendEachForMulticastAsync(multicastMsg);
 
             var failedTokens = new List<string>();
 
@@ -118,24 +114,36 @@ public class FirebasePushProvider : IPushNotificationProvider
                     Body = pm.Body
                 },
             Data = pm.Data,
-            Token = token
+            Token = token,
+            Android = BuildAndroidConfig(pm),
+            Apns = BuildApnsConfig(pm),
+            Webpush = BuildWebpushConfig(pm)
         };
-
-        if (pm.ChannelId is not null)
-        {
-            msg.Android = new AndroidConfig
-            {
-                Priority = Priority.High,
-                Notification = new AndroidNotification
-                {
-                    ChannelId = pm.ChannelId,
-                    Tag = pm.Tag,
-                }
-            };
-        }
 
         return msg;
     }
+
+    private static AndroidConfig BuildAndroidConfig(PushMessage message) => new()
+    {
+        Priority = Priority.High,
+        Notification = new AndroidNotification
+        {
+            ChannelId = string.IsNullOrWhiteSpace(message.ChannelId) ? "chat_messages" : message.ChannelId,
+            Tag = message.Tag,
+            Sound = "default"
+        }
+    };
+
+    private static ApnsConfig BuildApnsConfig(PushMessage message) => new()
+    {
+        Headers = new Dictionary<string, string> { ["apns-push-type"] = "alert", ["apns-priority"] = "10" },
+        Aps = new Aps { Sound = "default", ThreadId = string.IsNullOrEmpty(message.Tag) ? null : message.Tag }
+    };
+
+    private static WebpushConfig BuildWebpushConfig(PushMessage message) => new()
+    {
+        Notification = new WebpushNotification { Tag = message.Tag }
+    };
 
     private static bool IsInvalidTokenError(FirebaseMessagingException ex)
     {
