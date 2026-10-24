@@ -104,7 +104,19 @@ public class MediaServiceTests
         Assert.That((await _service.AttachToMessageAsync(avatar.MediaId, message.Id)).IsFailure, Is.True);
         _db.Context.ChangeTracker.Clear();
         Assert.That((await _db.Context.MediaFiles.SingleAsync(m => m.Id == messageMedia.MediaId)).OwnerId, Is.EqualTo(message.Id));
+        Assert.That(await _db.Context.MediaAttachments.CountAsync(a => a.MediaFileId == messageMedia.MediaId && a.MessageId == message.Id), Is.EqualTo(1));
+        Assert.That((await _service.AttachToMessageAsync(messageMedia.MediaId, message.Id)).IsSuccess, Is.True);
+        Assert.That(await _db.Context.MediaAttachments.CountAsync(a => a.MediaFileId == messageMedia.MediaId), Is.EqualTo(1));
         Assert.That((await _db.Context.MediaFiles.SingleAsync(m => m.Id == avatar.MediaId)).OwnerType, Is.EqualTo(MediaOwnerType.Avatar));
+    }
+
+    [Test]
+    public async Task AttachmentCannotBeBoundToAnotherAuthorsMessage()
+    {
+        var uploaded = (await Upload()).Value;
+        var message = _db.AddMessage(sender: _db.Bob);
+        Assert.That((await _service.AttachToMessageAsync(uploaded.MediaId, message.Id)).IsFailure, Is.True);
+        Assert.That(await _db.Context.MediaAttachments.CountAsync(), Is.Zero);
     }
 }
 

@@ -33,6 +33,7 @@ public class MediaController : Controller
 
     [HttpPost("upload")]
     [RequestSizeLimit(20_000_000)] // ~20MB
+    [RequestFormLimits(MultipartBodyLengthLimit = 20_000_000)]
     public async Task<IActionResult> Upload([FromForm] MediaUploadRequest request)
     {
         if (!ModelState.IsValid)
@@ -47,7 +48,8 @@ public class MediaController : Controller
         if (request.FromFile.Length > 20_000_000)
             return BadRequest("File is too large");
 
-        if (string.IsNullOrWhiteSpace(request.MimeType))
+        if (string.IsNullOrWhiteSpace(request.MimeType) || request.MimeType.Length > 128 ||
+            !Enum.IsDefined(request.Type))
             return BadRequest("Missing MIME type");
 
         if (request.OwnerType == MediaOwnerType.Message &&
@@ -57,13 +59,17 @@ public class MediaController : Controller
         try
         {
             byte[] fileBytes = await ReadFileAsync(request.FromFile);
-           
+
             var media = new Media(
                 _currentUserService.GetCurrentUserId(),
                 DateTime.UtcNow,
-                Path.GetFileName(request.FromFile.FileName),
+                request.OwnerType == MediaOwnerType.Message
+                    ? Guid.NewGuid().ToString("N") + ".bin"
+                    : Path.GetFileName(request.FromFile.FileName),
                 fileBytes,
-                request.Type,
+                request.OwnerType == MediaOwnerType.Message
+                    ? Govor.Domain.Models.Messages.MediaType.File
+                    : request.Type,
                 request.MimeType,
                 request.EncryptedKey ?? string.Empty,
                 request.OwnerType,
@@ -71,29 +77,33 @@ public class MediaController : Controller
             {
                 OwnerType = request.OwnerType,
                 OwnerId = request.OwnerType == MediaOwnerType.Avatar
-            ? _currentUserService.GetCurrentUserId()
-            : null,
+                    ? _currentUserService.GetCurrentUserId()
+                    : null,
             };
 
             var result = await _mediaService.UploadMediaAsync(media);
 
             _logger.LogInformation("Uploaded file {FileName} from user {UserId}",
                 media.FileName, media.UploaderId);
-            
+
             if (result.IsFailure)
             {
                 _logger.LogWarning("Uploaded file {FileName} from user {UserId} finished with error: {Error}",
-                    media.FileName, 
-                    media.UploaderId, 
+                    media.FileName,
+                    media.UploaderId,
                     result.Error);
             }
-            
+
             return result.ToActionResult();
         }
         catch (UnauthorizedAccessException ex)
         {
             _logger.LogWarning(ex, ex.Message);
             return Forbid();
+        }
+        catch (InvalidDataException)
+        {
+            return BadRequest("Invalid file or file is too large.");
         }
         catch (Exception ex)
         {
@@ -105,7 +115,16 @@ public class MediaController : Controller
     private async Task<byte[]> ReadFileAsync(IFormFile file)
     {
         await using var ms = new MemoryStream();
-        await file.CopyToAsync(ms);
+        await using var source = file.OpenReadStream();
+        var buffer = new byte[81920];
+        int read;
+        while ((read = await source.ReadAsync(buffer)) != 0)
+        {
+            if (ms.Length + read > 20_000_000) throw new InvalidDataException();
+            await ms.WriteAsync(buffer.AsMemory(0, read));
+        }
+
+        if (ms.Length == 0 || ms.Length != file.Length) throw new InvalidDataException();
         return ms.ToArray();
     }
 
@@ -119,11 +138,17 @@ public class MediaController : Controller
             return Forbid();
 
         var mediaResult = await _mediaService.GetMediaByIdAsync(id);
-        
+
         if (mediaResult.IsFailure)
             return mediaResult.ToActionResult();
-        
+
         var media = mediaResult.Value;
+        if (HttpContext is not null)
+        {
+            Response.Headers.CacheControl = "no-store";
+            Response.Headers["X-Content-Type-Options"] = "nosniff";
+        }
+
         return File(media.Data, media.MimeType, Path.GetFileName(media.FileName));
     }
 }

@@ -11,7 +11,7 @@ public class MediaUploadRequest
     public IFormFile FromFile { get; set; }
     [Required]
     public MediaType Type { get; set; }
-    [Required, MaxLength(255)]
+    [Required, MaxLength(128)]
     public string MimeType { get; set; } = string.Empty;
     public string? EncryptedKey { get; set; } = string.Empty;
     [Required]

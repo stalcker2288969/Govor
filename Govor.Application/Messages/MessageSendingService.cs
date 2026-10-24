@@ -48,7 +48,8 @@ public class MessageSendingService : IMessageSendingService
     {
         var media = sendParams.Media?.ToArray() ?? [];
         if ((string.IsNullOrWhiteSpace(sendParams.EncryptContent) && media.Length == 0) ||
-            (sendParams.EncryptContent?.Length ?? 0) > E2eeProtocol.MaxEnvelopeLength || media.Length > 100)
+            (sendParams.EncryptContent?.Length ?? 0) > E2eeProtocol.MaxEnvelopeLength || media.Length > 100 ||
+            media.Any(m => m.MediaId == Guid.Empty) || media.Select(m => m.MediaId).Distinct().Count() != media.Length)
             return new SendMessageResult(false, new ArgumentException("Invalid message content or attachment count."), default);
 
         var validationResult = sendParams.RecipientType switch
@@ -67,7 +68,11 @@ public class MessageSendingService : IMessageSendingService
         var completed = await _dbContext.Messages.AsNoTracking().Include(m => m.MediaAttachments)
             .ThenInclude(m => m.MediaFile).FirstOrDefaultAsync(m => m.Id == operationId);
         if (completed is not null)
-            return completed.SenderId == sendParams.FromUserId && completed.EncryptedContent == sendParams.EncryptContent
+            return completed.SenderId == sendParams.FromUserId && completed.EncryptedContent == sendParams.EncryptContent &&
+                completed.RecipientId == sendParams.RecipientId && completed.RecipientType == sendParams.RecipientType &&
+                completed.ReplyToMessageId == sendParams.ReplyToMessageId &&
+                completed.MediaAttachments.Select(a => a.MediaFileId).Order().SequenceEqual(media.Select(a => a.MediaId).Order()) &&
+                (!E2eeProtocol.IsEncrypted(sendParams.EncryptContent) || media.All(m => string.IsNullOrEmpty(m.EncryptedKey)))
                 ? new SendMessageResult(true, null, completed)
                 : new SendMessageResult(false, new ArgumentException("Message ID already exists."), default);
 

@@ -1,5 +1,7 @@
 using Govor.Application.Storage;
 using Govor.Domain.Models;
+using Govor.Domain.Models.Messages;
+using Govor.Application.E2ee;
 using Govor.Domain;
 using Govor.Domain.Common;
 using Microsoft.EntityFrameworkCore;
@@ -168,6 +170,20 @@ public class MediaService : IMediaService
                 $"Media {mediaId} is already attached to {mediaFile.OwnerType}")
             );
         }
+
+        var message = await _dbContext.Messages.FirstOrDefaultAsync(m => m.Id == messageId);
+        if (message is null)
+            return Result<Unit, Error>.Failure(Error.NotFound("File.AttachToMessage", "Message not found."));
+        if (message.SenderId != mediaFile.UploaderId)
+            return Result<Unit, Error>.Failure(Error.Forbidden("File.AttachToMessage", "Only the message author's uploads can be attached."));
+        if (E2eeProtocol.IsEncrypted(message.EncryptedContent) &&
+            (mediaFile.MineType != E2eeProtocol.EncryptedMimeType ||
+             !E2eeProtocol.Inspect(message.EncryptedContent).MediaIds.Contains(mediaId)))
+            return Result<Unit, Error>.Failure(Error.Validation("File.AttachToMessage", "Attachment is not authenticated by the encrypted message."));
+
+        if (!await _dbContext.MediaAttachments.AnyAsync(a => a.MediaFileId == mediaId && a.MessageId == messageId))
+            _dbContext.MediaAttachments.Add(new MediaAttachments
+            { Id = Guid.NewGuid(), MediaFileId = mediaId, MessageId = messageId });
 
         mediaFile.OwnerType = MediaOwnerType.Message;
         mediaFile.OwnerId = messageId;
