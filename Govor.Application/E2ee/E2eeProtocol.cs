@@ -17,6 +17,10 @@ public sealed record DeviceKey(
     string Signature)
 {
     public string Fingerprint => E2eeProtocol.Fingerprint(IdentityKey, EncryptionKey);
+    public string? AccountIdentityKey { get; init; }
+    public string? AccountSignature { get; init; }
+    public long Generation { get; init; }
+    public string? PreviousFingerprint { get; init; }
 }
 
 public sealed record ConversationKeys(
@@ -50,6 +54,7 @@ public static class E2eeProtocol
     public const int MaxEnvelopeLength = 1_000_000;
     public const int MaxDevices = 500;
     public const string EncryptedMimeType = "application/vnd.govor.encrypted";
+    public const string DevicesChangedError = "E2EE_DEVICES_CHANGED";
     public static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
     public static bool IsEncrypted(string? value)
@@ -91,6 +96,8 @@ public static class E2eeProtocol
             !signing.VerifyData(KeyBinding(key.EncryptionKey), Convert.FromBase64String(key.Signature),
                 HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
             throw new CryptographicException("Invalid E2EE key binding signature.");
+        if (key.AccountIdentityKey is not null || key.AccountSignature is not null)
+            E2eeRecoveryProtocol.VerifyCertificate(key);
     }
 
     public static string Fingerprint(string identity, string encryption)
@@ -188,16 +195,25 @@ public static class E2eeProtocol
         Guid expectedConversation, int expectedType, Guid expectedAuthor, Guid? expectedReply = null,
         bool? expectedEdit = null)
     {
+        using var signing = SigningPrivateKey(keys);
+        return DecryptHistory(value, new HistoryKey(Convert.ToBase64String(signing.ExportSubjectPublicKeyInfo()),
+            keys.EncryptionKey), expectedMessage, expectedConversation, expectedType, expectedAuthor, expectedReply, expectedEdit);
+    }
+
+    public static MessagePlaintext DecryptHistory(string value, HistoryKey keys, Guid expectedMessage,
+        Guid expectedConversation, int expectedType, Guid expectedAuthor, Guid? expectedReply = null,
+        bool? expectedEdit = null)
+    {
         var envelope = Verify(value);
         if (envelope.MessageId != expectedMessage || envelope.ConversationId != expectedConversation ||
             envelope.RecipientType != expectedType || envelope.Sender.UserId != expectedAuthor ||
-            envelope.ReplyToMessageId != expectedReply ||
-            (expectedEdit.HasValue && envelope.IsEdit != expectedEdit))
+            envelope.ReplyToMessageId != expectedReply || (expectedEdit.HasValue && envelope.IsEdit != expectedEdit))
             throw new CryptographicException("E2EE message context does not match.");
-        using var rsa = EncryptionPrivateKey(keys);
-        using var signing = SigningPrivateKey(keys);
-        var fingerprint = Fingerprint(Convert.ToBase64String(signing.ExportSubjectPublicKeyInfo()),
-            Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()));
+        var fingerprint = keys.Fingerprint;
+        using var rsa = RSA.Create();
+        var privateBytes = Convert.FromBase64String(keys.EncryptionKey);
+        try { rsa.ImportPkcs8PrivateKey(privateBytes, out _); }
+        finally { CryptographicOperations.ZeroMemory(privateBytes); }
         if (!envelope.Recipients.Contains(fingerprint, StringComparer.Ordinal))
             throw new CryptographicException("This device cannot decrypt this message.");
         // Select our recipient explicitly. In particular Windows CNG can throw an

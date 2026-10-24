@@ -9,6 +9,10 @@ public class UserCryptoSessionConfiguration : IEntityTypeConfiguration<UserCrypt
     public void Configure(EntityTypeBuilder<UserCryptoSession> builder)
     {
         builder.HasKey(ucs => ucs.Id);
+        builder.Property(c => c.Generation).IsConcurrencyToken();
+        builder.Property(c => c.AccountIdentityKey).HasMaxLength(200);
+        builder.Property(c => c.AccountSignature).HasMaxLength(100);
+        builder.Property(c => c.PreviousFingerprint).HasMaxLength(64);
         
         builder.HasOne(ucs => ucs.UserSession)
             .WithOne(us => us.CryptoSession)

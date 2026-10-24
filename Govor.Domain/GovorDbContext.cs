@@ -14,6 +14,7 @@ public class GovorDbContext(DbContextOptions<GovorDbContext> options) : DbContex
     public virtual DbSet<UserSession> UserSessions { get; set; }
     public virtual DbSet<UserPushToken>  UserPushTokens { get; set; }
     public virtual DbSet<UserCryptoSession> UserCryptoSessions { get; set; }
+    public virtual DbSet<E2eeRecoveryVault> E2eeRecoveryVaults { get; set; }
     public virtual DbSet<SignedPreKey> SignedPreKeys { get; set; }
     public virtual DbSet<OneTimePreKey> OneTimePreKeys { get; set; }
     public virtual DbSet<Friendship> Friendships { get; set; }
@@ -41,6 +42,7 @@ public class GovorDbContext(DbContextOptions<GovorDbContext> options) : DbContex
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.ApplyConfiguration(new E2eeRecoveryVaultConfiguration());
         modelBuilder.ApplyConfiguration(new UserSessionConfiguration());
         modelBuilder.ApplyConfiguration(new FriendshipConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
