@@ -13,8 +13,7 @@ public class MediaUploadRequest
     public MediaType Type { get; set; }
     [Required, MaxLength(255)]
     public string MimeType { get; set; } = string.Empty;
-    [Required]
-    public string EncryptedKey { get; set; } = string.Empty;
+    public string? EncryptedKey { get; set; } = string.Empty;
     [Required]
     public MediaOwnerType OwnerType { get; set; } = MediaOwnerType.Message;
 }

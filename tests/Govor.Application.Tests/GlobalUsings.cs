@@ -1,0 +1,10 @@
+global using Govor.Application.Authentication;
+global using Govor.Application.Authentication.JWT;
+global using Govor.Application.Friends;
+global using Govor.Application.Infrastructure.Extensions;
+global using Govor.Application.Infrastructure.Validators;
+global using Govor.Application.Medias;
+global using Govor.Application.Storage;
+global using Govor.Application.Users.UserOnlineStatus;
+global using Govor.Application.Users.UserSessions;
+global using Govor.Domain;

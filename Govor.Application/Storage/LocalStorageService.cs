@@ -6,7 +6,7 @@ public class LocalStorageService : IStorageService
     
     public LocalStorageService(string contentRootPath)
     {
-        _storagePath = Path.Combine(contentRootPath, "uploads");
+        _storagePath = Path.GetFullPath(Path.Combine(contentRootPath, "uploads"));
         
         if (!Directory.Exists(_storagePath))
         {
@@ -38,7 +38,7 @@ public class LocalStorageService : IStorageService
 
     public async Task<Stream> LoadAsync(string url)
     {
-        var filePath = Path.Combine(_storagePath, url); 
+        var filePath = ResolvePath(url);
 
         if (!File.Exists(filePath))
             throw new FileNotFoundException("File not found.", filePath);
@@ -48,15 +48,7 @@ public class LocalStorageService : IStorageService
 
     public async Task RemoveAsync(string url)
     {
-        if (string.IsNullOrWhiteSpace(url))
-            throw new ArgumentException("Invalid file url");
-        
-        var rootPath = Path.GetFullPath(_storagePath);
-        
-        var fullPath = Path.GetFullPath(Path.Combine(rootPath, url));
-        
-        if (!fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
-            throw new UnauthorizedAccessException("Invalid file path");
+        var fullPath = ResolvePath(url);
 
         if (!File.Exists(fullPath))
             return;
@@ -79,5 +71,16 @@ public class LocalStorageService : IStorageService
         }
 
         await Task.CompletedTask;
+    }
+
+    private string ResolvePath(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("Invalid file url", nameof(url));
+        if (Path.IsPathRooted(url)) throw new UnauthorizedAccessException("Invalid file path");
+        var fullPath = Path.GetFullPath(Path.Combine(_storagePath, url));
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!fullPath.StartsWith(_storagePath + Path.DirectorySeparatorChar, comparison))
+            throw new UnauthorizedAccessException("Invalid file path");
+        return fullPath;
     }
 }

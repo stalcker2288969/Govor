@@ -3,5 +3,10 @@
   <Project Path="Govor.Application/Govor.Application.csproj" />
   <Project Path="Govor.Contracts/Govor.Contracts.csproj" />
   <Project Path="Govor.Domain/Govor.Domain.csproj" />
-  <Project Path="Govor.Server.Tests/Govor.Server.Tests.csproj" />
+  <Folder Name="/tests/">
+    <Project Path="tests/Govor.API.Tests/Govor.API.Tests.csproj" />
+    <Project Path="tests/Govor.Application.Tests/Govor.Application.Tests.csproj" />
+    <Project Path="tests/Govor.Domain.Tests/Govor.Domain.Tests.csproj" />
+    <Project Path="tests/Govor.Server.Tests/Govor.Server.Tests.csproj" />
+  </Folder>
 </Solution>

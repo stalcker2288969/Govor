@@ -127,7 +127,7 @@ mode: All=0 — все активные реакции; None=1 — новые р
 
 ```powershell
 dotnet ef database update --project Govor.Domain --startup-project Govor.API
-dotnet test Govor.Server.Tests/Govor.Server.Tests.csproj -c Release
+dotnet test tests/Govor.Server.Tests/Govor.Server.Tests.csproj -c Release
 ```
 
 Миграция `20261003101700_ReactionPacksAndChannelPolicies` создаёт каталог, установки, разрешения канала, версии и базовый пак; старые реакции сохраняются. Она подготовлена, но к вашей рабочей БД автоматически не применялась. Локальные тесты используют SQLite и HTTP pipeline с JWT; SignalR-доставка проверяется через mock транспорта. CI также настроен на PostgreSQL. Реальные устройства/сокеты и PostgreSQL локально не проверены.

@@ -28,12 +28,12 @@ FCM разбивается на пачки до 500. Временный отка
 
 ## Сборка и обновление
 
-Используйте .NET SDK 10 и `Govor.Server.slnx`: она включает актуальный сервер и Govor.Server.Tests, без удалённых проектов и внешнего исходного проекта SmartRes. Бинарный `libs/SmartRes.dll` используется по существующему правилу репозитория. Legacy-тесты net8 в старой solution не перенесены.
+Используйте .NET SDK 10 и `Govor.Server.slnx`: она включает актуальный сервер и Govor.Server.Tests, без удалённых проектов и внешнего исходного проекта SmartRes. Бинарный `libs/SmartRes.dll` используется по существующему правилу репозитория. Обновление 24.10.2026: серверные тесты перенесены в tests, обновлены до .NET 10 и подключены к обоим solution. Инструкции и результаты — в [tests/README.md](../tests/README.md).
 
 ```powershell
 dotnet restore Govor.Server.slnx
 dotnet build Govor.Server.slnx --no-restore -c Release
-dotnet test Govor.Server.Tests/Govor.Server.Tests.csproj --no-build -c Release
+dotnet test Govor.Server.slnx --no-build -c Release
 dotnet ef database update --project Govor.Domain --startup-project Govor.API
 ```
 

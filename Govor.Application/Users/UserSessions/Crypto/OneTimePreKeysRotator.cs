@@ -23,10 +23,13 @@ public class OneTimePreKeysRotator : IOneTimePreKeysRotator
     {
         var cryptoSession = await _context.UserCryptoSessions
             .Include(c => c.OneTimePreKeys)
+            .Include(c => c.UserSession)
             .FirstOrDefaultAsync(c => c.UserSessionId == sessionId);
 
         if (cryptoSession == null)
             throw new ArgumentException("Crypto session not found", nameof(sessionId));
+        if (cryptoSession.UserSession.UserId != _current.GetCurrentUserId())
+            throw new UnauthorizedAccessException("Only the session owner can rotate its keys.");
 
         // Удаляем все использованные ключи
         var usedKeys = cryptoSession.OneTimePreKeys.Where(k => k.IsUsed).ToList();
@@ -38,9 +41,10 @@ public class OneTimePreKeysRotator : IOneTimePreKeysRotator
         // Добавляем новые ключи (возможно, стоит ограничить количество)
         foreach (var key in newOneTimePreKeys)
         {
-            cryptoSession.OneTimePreKeys.Add(new OneTimePreKey
+            _context.OneTimePreKeys.Add(new OneTimePreKey
             {
                 Id = Guid.NewGuid(),
+                UserCryptoSessionId = cryptoSession.Id,
                 PublicKey = key,
                 IsUsed = false,
                 UploadedAt = DateTime.UtcNow
@@ -54,10 +58,13 @@ public class OneTimePreKeysRotator : IOneTimePreKeysRotator
     {
         var key = await _context.OneTimePreKeys
             .Include(k => k.UserCryptoSession)
+            .ThenInclude(c => c.UserSession)
             .FirstOrDefaultAsync(k => k.Id == oneTimePreKeyId && k.UserCryptoSession.UserSessionId == sessionId);
 
         if (key == null)
             throw new ArgumentException("One-Time PreKey not found for this session", nameof(oneTimePreKeyId));
+        if (key.UserCryptoSession.UserSession.UserId != _current.GetCurrentUserId())
+            throw new UnauthorizedAccessException("Only the session owner can consume its keys.");
 
         if (key.IsUsed)
             return; // Уже помечен

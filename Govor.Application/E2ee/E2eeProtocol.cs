@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Jose;
 using AesGcm = System.Security.Cryptography.AesGcm;
 
@@ -8,19 +9,39 @@ namespace Govor.Application.E2ee;
 
 // Shared verbatim with the mobile client. JOSE implements RFC 7515/7516;
 // the application envelope binds the ciphertext to its author and conversation.
-public sealed record DeviceKey(Guid UserId, Guid SessionId, string IdentityKey,
-    string EncryptionKey, string Signature)
+public sealed record DeviceKey(
+    Guid UserId,
+    Guid SessionId,
+    string IdentityKey,
+    string EncryptionKey,
+    string Signature)
 {
     public string Fingerprint => E2eeProtocol.Fingerprint(IdentityKey, EncryptionKey);
 }
 
-public sealed record ConversationKeys(Guid ConversationId, int RecipientType,
-    Guid[] Members, DeviceKey[] Devices);
+public sealed record ConversationKeys(
+    Guid ConversationId,
+    int RecipientType,
+    Guid[] Members,
+    DeviceKey[] Devices);
+
 public sealed record AttachmentSecret(Guid MediaId, string Key, string FileName, string MimeType);
+
 public sealed record MessagePlaintext(string Text, AttachmentSecret[] Attachments);
-public sealed record EncryptedMessage(int Version, Guid MessageId, Guid ConversationId,
-    int RecipientType, DeviceKey Sender, Guid? ReplyToMessageId, long CreatedAt,
-    bool IsEdit, string[] Recipients, Guid[] MediaIds, string Ciphertext);
+
+public sealed record EncryptedMessage(
+    int Version,
+    Guid MessageId,
+    Guid ConversationId,
+    int RecipientType,
+    DeviceKey Sender,
+    Guid? ReplyToMessageId,
+    long CreatedAt,
+    bool IsEdit,
+    string[] Recipients,
+    Guid[] MediaIds,
+    string Ciphertext);
+
 public sealed record DevicePrivateKeys(string IdentityKey, string EncryptionKey);
 
 public static class E2eeProtocol
@@ -31,13 +52,16 @@ public static class E2eeProtocol
     public const string EncryptedMimeType = "application/vnd.govor.encrypted";
     public static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true };
 
-    public static bool IsEncrypted(string? value) => value?.StartsWith(Prefix, StringComparison.Ordinal) == true;
+    public static bool IsEncrypted(string? value)
+    {
+        return value?.StartsWith(Prefix, StringComparison.Ordinal) == true;
+    }
 
     public static DevicePrivateKeys GenerateKeys()
     {
         using var signing = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var encryption = RSA.Create(3072);
-        return new(Convert.ToBase64String(signing.ExportPkcs8PrivateKey()),
+        return new DevicePrivateKeys(Convert.ToBase64String(signing.ExportPkcs8PrivateKey()),
             Convert.ToBase64String(encryption.ExportPkcs8PrivateKey()));
     }
 
@@ -50,7 +74,7 @@ public static class E2eeProtocol
         // Domain separation prevents using this signature as a message signature.
         var signature = signing.SignData(KeyBinding(publicEncryption), HashAlgorithmName.SHA256,
             DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-        return new(user, session, identity, publicEncryption, Convert.ToBase64String(signature));
+        return new DeviceKey(user, session, identity, publicEncryption, Convert.ToBase64String(signature));
     }
 
     public static void ValidatePublicKey(DeviceKey key)
@@ -69,8 +93,11 @@ public static class E2eeProtocol
             throw new CryptographicException("Invalid E2EE key binding signature.");
     }
 
-    public static string Fingerprint(string identity, string encryption) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"govor-device-v1\n{identity}\n{encryption}")));
+    public static string Fingerprint(string identity, string encryption)
+    {
+        return Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes($"govor-device-v1\n{identity}\n{encryption}")));
+    }
 
     public static string Encrypt(MessagePlaintext plaintext, DevicePrivateKeys privateKeys,
         DeviceKey sender, ConversationKeys conversation, Guid messageId, Guid? replyTo = null,
@@ -96,7 +123,8 @@ public static class E2eeProtocol
             }).ToArray();
             var ciphertext = JWE.Encrypt(JsonSerializer.Serialize(plaintext), recipients, JweEncryption.A256GCM);
             var envelope = new EncryptedMessage(1, messageId, conversation.ConversationId,
-                conversation.RecipientType, sender, replyTo, createdAt ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                conversation.RecipientType, sender, replyTo,
+                createdAt ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 isEdit, devices.Select(k => k.Fingerprint).Order(StringComparer.Ordinal).ToArray(),
                 plaintext.Attachments.Select(a => a.MediaId).Order().ToArray(), ciphertext);
             using var signing = SigningPrivateKey(privateKeys);
@@ -104,7 +132,10 @@ public static class E2eeProtocol
             if (result.Length > MaxEnvelopeLength) throw new CryptographicException("E2EE envelope is too large.");
             return result;
         }
-        finally { foreach (var key in keys) key.Dispose(); }
+        finally
+        {
+            foreach (var key in keys) key.Dispose();
+        }
     }
 
     // Reading the unverified payload is used only to select its verification key.
@@ -116,7 +147,7 @@ public static class E2eeProtocol
         var parts = value[Prefix.Length..].Split('.');
         if (parts.Length != 3) throw new CryptographicException("Invalid signed E2EE envelope.");
         var envelope = JsonSerializer.Deserialize<EncryptedMessage>(Base64Url.Decode(parts[1]), Json)
-            ?? throw new CryptographicException("Invalid E2EE envelope.");
+                       ?? throw new CryptographicException("Invalid E2EE envelope.");
         if (envelope.Version != 1 || envelope.Sender is null || envelope.MessageId == Guid.Empty ||
             envelope.ConversationId == Guid.Empty || envelope.RecipientType is < 0 or > 1 ||
             envelope.Recipients is null || envelope.Recipients.Length is 0 or > MaxDevices ||
@@ -142,7 +173,8 @@ public static class E2eeProtocol
             header.RootElement.TryGetProperty("zip", out _))
             throw new CryptographicException("Unsupported content encryption.");
         var recipients = root.TryGetProperty("recipients", out var many)
-            ? many.EnumerateArray().ToArray() : new[] { root };
+            ? many.EnumerateArray().ToArray()
+            : new[] { root };
         if (recipients.Length != envelope.Recipients.Length ||
             recipients.Any(r => r.GetProperty("header").GetProperty("alg").GetString() != "RSA-OAEP-256") ||
             !recipients.Select(r => r.GetProperty("header").GetProperty("kid").GetString())
@@ -170,16 +202,17 @@ public static class E2eeProtocol
             throw new CryptographicException("This device cannot decrypt this message.");
         // Select our recipient explicitly. In particular Windows CNG can throw an
         // OS-specific error while trying another recipient's RSA-OAEP encrypted key.
-        var selected = System.Text.Json.Nodes.JsonNode.Parse(envelope.Ciphertext)!;
-        if (selected["recipients"] is System.Text.Json.Nodes.JsonArray recipients)
+        var selected = JsonNode.Parse(envelope.Ciphertext)!;
+        if (selected["recipients"] is JsonArray recipients)
         {
             var recipient = recipients.Single(r => r!["header"]!["kid"]!.GetValue<string>() == fingerprint)!;
-            selected["recipients"] = new System.Text.Json.Nodes.JsonArray(recipient.DeepClone());
+            selected["recipients"] = new JsonArray(recipient.DeepClone());
         }
+
         var decrypted = JWE.Decrypt(selected.ToJsonString(), rsa,
             JweAlgorithm.RSA_OAEP_256, JweEncryption.A256GCM);
         var plaintext = JsonSerializer.Deserialize<MessagePlaintext>(decrypted.Plaintext, Json)
-            ?? throw new CryptographicException("Invalid encrypted content.");
+                        ?? throw new CryptographicException("Invalid encrypted content.");
         if (plaintext.Text is null || plaintext.Text.Length > 20_000 || plaintext.Attachments is null ||
             !plaintext.Attachments.Select(a => a.MediaId).Order().SequenceEqual(envelope.MediaIds.Order()))
             throw new CryptographicException("Invalid encrypted attachment manifest.");
@@ -195,11 +228,15 @@ public static class E2eeProtocol
             var data = new byte[12 + plaintext.Length + 16];
             RandomNumberGenerator.Fill(data.AsSpan(0, 12));
             using var aes = new AesGcm(key, 16);
-            aes.Encrypt(data.AsSpan(0, 12), plaintext, data.AsSpan(12, plaintext.Length), data.AsSpan(12 + plaintext.Length, 16),
+            aes.Encrypt(data.AsSpan(0, 12), plaintext, data.AsSpan(12, plaintext.Length),
+                data.AsSpan(12 + plaintext.Length, 16),
                 "govor-attachment-v1"u8);
             return (data, Convert.ToBase64String(key));
         }
-        finally { CryptographicOperations.ZeroMemory(key); }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
     }
 
     public static byte[] DecryptAttachment(byte[] ciphertext, string encodedKey)
@@ -215,26 +252,57 @@ public static class E2eeProtocol
                 ciphertext.AsSpan(12 + plaintext.Length, 16), plaintext, "govor-attachment-v1"u8);
             return plaintext;
         }
-        finally { CryptographicOperations.ZeroMemory(key); }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
+        }
     }
 
-    private static byte[] KeyBinding(string encryption) => Encoding.UTF8.GetBytes("govor-key-binding-v1\n" + encryption);
+    private static byte[] KeyBinding(string encryption)
+    {
+        return Encoding.UTF8.GetBytes("govor-key-binding-v1\n" + encryption);
+    }
+
     private static ECDsa SigningPrivateKey(DevicePrivateKeys keys)
     {
         var bytes = Convert.FromBase64String(keys.IdentityKey);
         var key = ECDsa.Create();
-        try { key.ImportPkcs8PrivateKey(bytes, out _); return key; }
-        catch { key.Dispose(); throw; }
-        finally { CryptographicOperations.ZeroMemory(bytes); }
+        try
+        {
+            key.ImportPkcs8PrivateKey(bytes, out _);
+            return key;
+        }
+        catch
+        {
+            key.Dispose();
+            throw;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
     }
+
     private static RSA EncryptionPrivateKey(DevicePrivateKeys keys)
     {
         var bytes = Convert.FromBase64String(keys.EncryptionKey);
         var key = RSA.Create();
-        try { key.ImportPkcs8PrivateKey(bytes, out _); return key; }
-        catch { key.Dispose(); throw; }
-        finally { CryptographicOperations.ZeroMemory(bytes); }
+        try
+        {
+            key.ImportPkcs8PrivateKey(bytes, out _);
+            return key;
+        }
+        catch
+        {
+            key.Dispose();
+            throw;
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
     }
+
     private static ECDsa SigningPublicKey(DeviceKey device)
     {
         var key = ECDsa.Create();
@@ -245,8 +313,13 @@ public static class E2eeProtocol
             if (read != bytes.Length) throw new CryptographicException("Trailing public key data.");
             return key;
         }
-        catch { key.Dispose(); throw; }
+        catch
+        {
+            key.Dispose();
+            throw;
+        }
     }
+
     private static RSA EncryptionPublicKey(DeviceKey device)
     {
         var key = RSA.Create();
@@ -257,6 +330,10 @@ public static class E2eeProtocol
             if (read != bytes.Length) throw new CryptographicException("Trailing public key data.");
             return key;
         }
-        catch { key.Dispose(); throw; }
+        catch
+        {
+            key.Dispose();
+            throw;
+        }
     }
 }

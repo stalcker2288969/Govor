@@ -55,6 +55,7 @@ public class SessionKeysReader : ISessionKeysReader
             .AsNoTracking()
             .Include(c => c.OneTimePreKeys)
             .Include(c => c.UserSession)
+            .Include(c => c.SignedPreKey)
             .FirstOrDefaultAsync(c => c.UserSessionId == sessionId);
     }
 }

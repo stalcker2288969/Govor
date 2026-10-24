@@ -50,6 +50,6 @@
 
 Изменения не требуют новой миграции; в БД должна быть применена существующая `20261003070406_ReliableChatPush`.
 
-Проверка: `dotnet test Govor.Server.Tests/Govor.Server.Tests.csproj`. Тесты проверяют HTTP API, SQL-очередь/аренду/retry, обработку ошибок и реальную сериализацию Firebase SDK через подменённый HTTP-транспорт. Для PostgreSQL предусмотрена `TEST_POSTGRES_CONNECTION` на отдельную БД с именем, заканчивающимся `_tests`. Эти тесты не подтверждают доставку на физическое устройство.
+Проверка: `dotnet test tests/Govor.Server.Tests/Govor.Server.Tests.csproj`. Тесты проверяют HTTP API, SQL-очередь/аренду/retry, обработку ошибок и реальную сериализацию Firebase SDK через подменённый HTTP-транспорт. Для PostgreSQL предусмотрена `TEST_POSTGRES_CONNECTION` на отдельную БД с именем, заканчивающимся `_tests`. Эти тесты не подтверждают доставку на физическое устройство.
 
 Лимит пакета и классификация ошибок сверены с [документацией отправки FCM](https://firebase.google.com/docs/cloud-messaging/send/admin-sdk) и [кодами ошибок FCM](https://firebase.google.com/docs/cloud-messaging/error-codes).

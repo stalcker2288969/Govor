@@ -61,23 +61,6 @@ public class UserSessionOpener : IUserSessionOpener
         }
     }
     
-    private async Task<RefreshResult> UpdateExistingSessionAsync(User user, string deviceInfo, UserSession session)
-    {
-        var (accessToken, refreshToken) = await GenerateTokensAsync(user, session.Id);
-
-        var newTokenHash = _jwtTokenHasher.HashToken(refreshToken);
-        var newExpiresAt = DateTime.UtcNow.AddDays(_options.RefreshTokenLifetimeDays);
-        
-        session.RefreshTokenHash = newTokenHash;
-        session.ExpiresAt = newExpiresAt;
-        session.CreatedAt = DateTime.UtcNow;
-        session.IsRevoked = false;
-        
-        _logger.LogInformation("Updated session for user {UserId} on device '{DeviceInfo}'", user.Id, deviceInfo);
-        
-        return new RefreshResult(refreshToken, accessToken);
-    }
-
     private async Task<RefreshResult> CreateNewSessionAsync(User user, string deviceInfo)
     {
         var sessionId = Guid.NewGuid();

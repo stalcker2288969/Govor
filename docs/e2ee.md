@@ -122,7 +122,7 @@ SecureStorage или потери устройства зашифрованна�
 ## Проверка
 
 ```powershell
-dotnet test Govor.Server.Tests/Govor.Server.Tests.csproj
+dotnet test tests/Govor.Server.Tests/Govor.Server.Tests.csproj
 # В мобильном репозитории:
 dotnet test Govor.Mobile.Tests/Govor.Mobile.Tests.csproj
 dotnet build Govor.Mobile/Govor.Mobile.csproj -f net10.0-android -p:TargetFrameworks=net10.0-android

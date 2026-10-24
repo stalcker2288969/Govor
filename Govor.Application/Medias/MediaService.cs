@@ -78,24 +78,29 @@ public class MediaService : IMediaService
         return new Unit();
     }
 
-    public Task<Result<Media, Error>> GetMediaByUrlAsync(string url)
+    public async Task<Result<Media, Error>> GetMediaByUrlAsync(string url)
     {
-        throw new NotImplementedException();
+        if (string.IsNullOrWhiteSpace(url))
+            return Result.Failure<Media>(Error.Validation("File.GetMediaByUrl", "Media URL is required."));
+        var file = await _dbContext.MediaFiles.AsNoTracking().FirstOrDefaultAsync(m => m.Url == url);
+        return await ReadMediaAsync(file, "File.GetMediaByUrl");
     }
 
     public async Task<Result<Media, Error>> GetMediaByIdAsync(Guid mediaId)
     {
+        var file = await _dbContext.MediaFiles.AsNoTracking().FirstOrDefaultAsync(m => m.Id == mediaId);
+        return await ReadMediaAsync(file, "File.GetMediaById");
+    }
+
+    private async Task<Result<Media, Error>> ReadMediaAsync(MediaFile? mediaFile, string errorCode)
+    {
         try
         {
-            var mediaFile = await _dbContext.MediaFiles
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == mediaId);
-
             if (mediaFile is null)
             {
                 return Result<Media, Error>.Failure(Error.NotFound(
-                    "File.GetMediaById", 
-                    $"File with given id ({mediaId}) doesn't exist!")
+                    errorCode,
+                    "Media file does not exist.")
                 );
             }
             
@@ -114,7 +119,7 @@ public class MediaService : IMediaService
             return new Media(
                 mediaFile.UploaderId,
                 mediaFile.DateCreated,
-                mediaFile.MediaType.ToString(),
+                Path.GetFileName(mediaFile.Url),
                 contentBytes,
                 mediaFile.MediaType,
                 mediaFile.MineType,
@@ -125,8 +130,8 @@ public class MediaService : IMediaService
         }
         catch (FileNotFoundException ex)
         {
-            _logger.LogWarning(ex, "Media file ({0}) not found on storage.", mediaId);
-            return Result<Media, Error>.Failure(Error.ServerError("File.GetMediaById", $"Media file not found on storage!"));
+            _logger.LogWarning(ex, "Media file {MediaId} not found on storage.", mediaFile?.Id);
+            return Result<Media, Error>.Failure(Error.ServerError(errorCode, "Media file not found on storage!"));
         }
     }
 

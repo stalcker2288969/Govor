@@ -52,7 +52,23 @@ jobs:
         run: dotnet build Govor.Server.slnx --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test Govor.Server.Tests/Govor.Server.Tests.csproj --no-build --configuration Release
+        run: dotnet test Govor.Server.slnx --no-build --no-restore --configuration Release --logger trx --results-directory artifacts/test-results --collect "XPlat Code Coverage;Format=json,cobertura"
+
+      - name: Check application coverage
+        shell: pwsh
+        run: ./tests/Measure-ApplicationCoverage.ps1 -ResultsDirectory artifacts/test-results
+
+      - name: Check API source coverage
+        shell: pwsh
+        run: ./tests/Measure-ApplicationCoverage.ps1 -ResultsDirectory artifacts/test-results -AssemblyName Govor.API -ExcludeGeneratedSources -MinimumLineCoverage 98 -MinimumBranchCoverage 92
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.database }}
+          path: artifacts/test-results
+          if-no-files-found: ignore
 
   publish:
     needs: build-and-test

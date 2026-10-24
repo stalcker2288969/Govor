@@ -146,7 +146,7 @@ GET `/api/admin/required-channel` возвращает channelId и allowLeave. 
 
 ```powershell
 dotnet ef database update --project Govor.Domain --startup-project Govor.API
-dotnet test Govor.Server.Tests/Govor.Server.Tests.csproj -c Release
+dotnet test tests/Govor.Server.Tests/Govor.Server.Tests.csproj -c Release
 ```
 
 Миграция `20261003131521_PrimitiveGroupsAndRequiredChannel` добавляет владельца, время создания, настройки сервера, лимиты/отзыв ссылок и уникальные индексы членства/админов/кодов. Старые дубли членства объединяются с сохранением бана; удаляются ссылки на отсутствующих пользователей и роли неактивных участников. Неоднозначные старые коды приглашений отзываются. Известное использование старых ссылок восстанавливается по сохранённым членствам; сведения о ранее вышедших пользователях в старой модели отсутствовали.

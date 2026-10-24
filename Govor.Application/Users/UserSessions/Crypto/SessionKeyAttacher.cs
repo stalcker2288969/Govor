@@ -64,6 +64,7 @@ public class SessionKeyAttacher : ISessionKeyAttacher
         };
 
         session.CryptoSession = cryptoSession;
+        _context.UserCryptoSessions.Add(cryptoSession);
 
         await _context.SaveChangesAsync();
 

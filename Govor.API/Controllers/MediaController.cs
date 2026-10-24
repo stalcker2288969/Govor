@@ -65,7 +65,7 @@ public class MediaController : Controller
                 fileBytes,
                 request.Type,
                 request.MimeType,
-                request.EncryptedKey,
+                request.EncryptedKey ?? string.Empty,
                 request.OwnerType,
                 null)
             {

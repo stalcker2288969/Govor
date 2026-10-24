@@ -22,3 +22,9 @@ This is my school project that I'm working on in my free time to level up my bac
 dock: https://nas-3.gitbook.io/govor-api
 
 Deployment: [Timeweb VPS + GitHub Actions](docs/vps-deployment.md) · [Timeweb App Platform](docs/timeweb-deployment.md).
+
+## Server tests
+
+Run all current server tests with `dotnet test Govor.Server.slnx -c Release`.
+See [tests/README.md](tests/README.md) for the project layout, PostgreSQL setup,
+coverage commands and validation limits.

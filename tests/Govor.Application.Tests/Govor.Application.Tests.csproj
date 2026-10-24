@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../Govor.Application/Govor.Application.csproj" />
+    <PackageReference Include="AutoFixture" Version="5.0.0-preview0012" />
+  </ItemGroup>
+</Project>

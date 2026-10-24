@@ -42,7 +42,7 @@ public class UsernameValidator : IUsernameValidator
     
     public Result<Unit, Error> Validate(string username)
     {
-        if (username.Length < UserConstants.MIN_LENGHT_OF_NAME || username.Length > UserConstants.MAX_LENGHT_OF_NAME)
+        if (string.IsNullOrEmpty(username) || username.Length < UserConstants.MIN_LENGHT_OF_NAME || username.Length > UserConstants.MAX_LENGHT_OF_NAME)
         {
             return Result.Failure(Error.Validation(
                 ErrorCode, 
