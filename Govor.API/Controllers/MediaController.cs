@@ -1,4 +1,5 @@
 using Govor.API.Common.Extensions;
+using Govor.Application.E2ee;
 using Govor.Application.Infrastructure.Extensions;
 using Govor.Application.Medias;
 using Govor.Contracts.Requests;
@@ -48,6 +49,10 @@ public class MediaController : Controller
 
         if (string.IsNullOrWhiteSpace(request.MimeType))
             return BadRequest("Missing MIME type");
+
+        if (request.OwnerType == MediaOwnerType.Message &&
+            (request.MimeType != E2eeProtocol.EncryptedMimeType || !string.IsNullOrEmpty(request.EncryptedKey)))
+            return BadRequest("Message attachments must be encrypted on the client. Do not upload decryption keys.");
 
         try
         {

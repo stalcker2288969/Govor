@@ -5,6 +5,7 @@ using Govor.Domain.Models.Messages;
 using Govor.Domain.Models;
 using Govor.Application.Groups;
 using Microsoft.Extensions.Logging;
+using Govor.Application.E2ee;
 
 namespace Govor.Application.Messages;
 
@@ -21,7 +22,10 @@ public class MessageSendingService : IMessageSendingService
     
     public async Task<SendMessageResult> SendMessageAsync(SendMessage sendParams)
     {
-        var operationId = Guid.NewGuid();
+        Guid operationId;
+        try { operationId = E2eeProtocol.IsEncrypted(sendParams.EncryptContent)
+            ? E2eeProtocol.Inspect(sendParams.EncryptContent).MessageId : Guid.NewGuid(); }
+        catch { return new SendMessageResult(false, new ArgumentException("Invalid E2EE envelope."), default); }
         if (sendParams.RecipientType != RecipientType.Group)
             return await SendCoreAsync(sendParams, operationId);
         return await _dbContext.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -32,9 +36,6 @@ public class MessageSendingService : IMessageSendingService
                 // Same group lock as moderation: bans/demotion cannot race a channel post.
                 await _dbContext.ChatGroups.Where(g => g.Id == sendParams.RecipientId)
                     .ExecuteUpdateAsync(s => s.SetProperty(g => g.Name, g => g.Name));
-                var completed = await _dbContext.Messages.AsNoTracking().Include(m => m.MediaAttachments)
-                    .FirstOrDefaultAsync(m => m.Id == operationId);
-                if (completed is not null) return new SendMessageResult(true, null, completed);
                 var result = await SendCoreAsync(sendParams, operationId);
                 if (result.IsSuccess) await transaction.CommitAsync();
                 return result;
@@ -47,7 +48,7 @@ public class MessageSendingService : IMessageSendingService
     {
         var media = sendParams.Media?.ToArray() ?? [];
         if ((string.IsNullOrWhiteSpace(sendParams.EncryptContent) && media.Length == 0) ||
-            (sendParams.EncryptContent?.Length ?? 0) > 50_000 || media.Length > 100)
+            (sendParams.EncryptContent?.Length ?? 0) > E2eeProtocol.MaxEnvelopeLength || media.Length > 100)
             return new SendMessageResult(false, new ArgumentException("Invalid message content or attachment count."), default);
 
         var validationResult = sendParams.RecipientType switch
@@ -63,16 +64,36 @@ public class MessageSendingService : IMessageSendingService
             return new SendMessageResult(false, new UnauthorizedAccessException(validationResult.Error), default);
         }
         
+        var completed = await _dbContext.Messages.AsNoTracking().Include(m => m.MediaAttachments)
+            .ThenInclude(m => m.MediaFile).FirstOrDefaultAsync(m => m.Id == operationId);
+        if (completed is not null)
+            return completed.SenderId == sendParams.FromUserId && completed.EncryptedContent == sendParams.EncryptContent
+                ? new SendMessageResult(true, null, completed)
+                : new SendMessageResult(false, new ArgumentException("Message ID already exists."), default);
+
         var mediaIds = media.Select(m => m.MediaId).Distinct().ToArray();
         var files = await _dbContext.MediaFiles.Where(m => mediaIds.Contains(m.Id) &&
             m.UploaderId == sendParams.FromUserId && m.OwnerType == MediaOwnerType.Message).ToListAsync();
         if (files.Count != mediaIds.Length)
             return new SendMessageResult(false, new UnauthorizedAccessException("Invalid media ownership."), default);
 
+        if (E2eeProtocol.IsEncrypted(sendParams.EncryptContent) &&
+            (files.Any(f => f.MineType != E2eeProtocol.EncryptedMimeType) || media.Any(m => !string.IsNullOrEmpty(m.EncryptedKey))))
+            return new SendMessageResult(false, new ArgumentException("E2EE attachments must be encrypted; keys belong inside the encrypted message."), default);
+
         if (sendParams.ReplyToMessageId.HasValue && !await _dbContext.Messages.AnyAsync(m =>
             m.Id == sendParams.ReplyToMessageId && m.RecipientId == sendParams.RecipientId &&
             m.RecipientType == sendParams.RecipientType))
             return new SendMessageResult(false, new ArgumentException("Reply must belong to the same chat."), default);
+
+        try
+        {
+            await new E2eeService(_dbContext).ValidateAsync(sendParams.EncryptContent, sendParams.FromUserId,
+                sendParams.RecipientId, sendParams.RecipientType, sendParams.ReplyToMessageId,
+                media.Select(m => m.MediaId).ToArray());
+        }
+        catch (Exception ex) when (ex is ArgumentException or UnauthorizedAccessException or InvalidOperationException)
+        { return new SendMessageResult(false, ex, default); }
 
         var messageId = operationId;
         var message = new Message

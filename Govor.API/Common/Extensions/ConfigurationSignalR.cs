@@ -9,6 +9,7 @@ public static class ConfigurationSignalR
     {
         services.AddSignalR(options =>
         {
+            options.MaximumReceiveMessageSize = 1_100_000;
             options.AddFilter<HubExceptionFilter>();
         });
     }

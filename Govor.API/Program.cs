@@ -211,5 +211,3 @@ app.MapSwagger()
 app.Map("/", () => "Not for browsers");
 
 app.Run();
-
-public partial class Program { }

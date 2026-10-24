@@ -7,6 +7,7 @@ using Govor.Application.Infrastructure.Common;
 using Govor.Application.Messages;
 using Govor.Application.Reactions;
 using AutoMapper;
+using Govor.Application.E2ee;
 using Govor.Application.Messages.Parameters;
 using Govor.Contracts.Requests.SignalR;
 using Govor.Contracts.Responses.SignalR;
@@ -241,6 +242,7 @@ public class ChatsHub : Hub
                 RecipientId = result.OriginalMessage.RecipientId,
                 RecipientType = result.OriginalMessage.RecipientType,
                 NewEncryptedContent = request.NewEncryptedContent,
+                ReplyToMessageId = result.OriginalMessage.ReplyToMessageId,
                 EditedAt = editParams.EditedAt,
             };
 
@@ -294,7 +296,7 @@ public class ChatsHub : Hub
         {
             throw new ArgumentException("Message must contain content or media.");
         }
-        if ((request.EncryptedContent?.Length ?? 0) > 50_000)
+        if ((request.EncryptedContent?.Length ?? 0) > E2eeProtocol.MaxEnvelopeLength)
         {
             throw new ArgumentException("Message is too long.");
         }

@@ -20,3 +20,5 @@ This is my school project that I'm working on in my free time to level up my bac
 - Frontend (separate project for now): .NET MAUI (cross-platform desktop/mobile client)
 
 dock: https://nas-3.gitbook.io/govor-api
+
+Deployment: [Timeweb VPS + GitHub Actions](docs/vps-deployment.md) · [Timeweb App Platform](docs/timeweb-deployment.md).

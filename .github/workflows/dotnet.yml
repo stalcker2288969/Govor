@@ -4,14 +4,19 @@
 name: .NET
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       matrix:
         database: [sqlite, postgres]
@@ -48,5 +53,79 @@ jobs:
 
       - name: Run tests
         run: dotnet test Govor.Server.Tests/Govor.Server.Tests.csproj --no-build --configuration Release
+
+  publish:
+    needs: build-and-test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && vars.VPS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and publish immutable image
+        id: image
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker build --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" -t "$image:$GITHUB_SHA" .
+          docker push "$image:$GITHUB_SHA"
+          digest="$(docker image inspect "$image:$GITHUB_SHA" --format '{{index .RepoDigests 0}}')"
+          echo "image=$digest" >> "$GITHUB_OUTPUT"
+      - name: Save deployment configuration for this commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: vps-deployment-${{ github.sha }}
+          path: |
+            deploy/compose.yaml
+            deploy/Caddyfile
+            deploy/deploy.sh
+          retention-days: 30
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: govor-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vps-deployment-${{ github.sha }}
+          path: deploy
+      - name: Deploy over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_SSH_PORT: ${{ vars.VPS_SSH_PORT || '22' }}
+          GOVOR_IMAGE: ${{ needs.publish.outputs.image }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$VPS_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.:-]*$ ]]
+          [[ "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$VPS_SSH_PORT" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$GOVOR_IMAGE" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]]
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          target="$VPS_USER@$VPS_HOST"
+          release="/opt/govor/releases/$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh_options=(-i ~/.ssh/id_ed25519 -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+          ssh "${ssh_options[@]}" -p "$VPS_SSH_PORT" "$target" "mkdir -p '$release'"
+          scp "${ssh_options[@]}" -P "$VPS_SSH_PORT" deploy/compose.yaml deploy/Caddyfile deploy/deploy.sh "$target:$release/"
+          ssh "${ssh_options[@]}" -p "$VPS_SSH_PORT" "$target" "bash '$release/deploy.sh' '$GOVOR_IMAGE'"
 
     

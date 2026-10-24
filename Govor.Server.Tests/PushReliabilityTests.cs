@@ -39,7 +39,7 @@ public class PushReliabilityTests
     public async Task SavedMessageHasDurablePushAndFailureRetriesAfterBackoff()
     {
         var sender = new MessageSendingService(_db.Context, NullLogger<MessageSendingService>.Instance);
-        var sent = await sender.SendMessageAsync(new SendMessage("hello", null, _db.ChatId,
+        var sent = await sender.SendMessageAsync(new SendMessage(await EncryptedHelloAsync(), null, _db.ChatId,
             Govor.Domain.Models.Messages.RecipientType.User, _db.Alice, _now, []));
         Assert.That(sent.IsSuccess, Is.True);
         Assert.That(await _db.Context.ChatPushNotifications.CountAsync(), Is.EqualTo(1));
@@ -58,6 +58,26 @@ public class PushReliabilityTests
         await new ChatPushDispatcher(restarted, notifier.Object, _clock.Object).DispatchAsync();
         notifier.Verify(n => n.DeliverPushAsync(It.IsAny<UserMessageResponse>()), Times.Exactly(2));
         Assert.That(await _db.Context.ChatPushNotifications.CountAsync(), Is.Zero);
+    }
+
+    private async Task<string> EncryptedHelloAsync()
+    {
+        var directory = new Govor.Application.E2ee.E2eeService(_db.Context);
+        var devices = new List<Govor.Security.DeviceKey>();
+        var privateKeys = Govor.Security.E2eeProtocol.GenerateKeys();
+        foreach (var user in new[] { _db.Alice, _db.Bob })
+        {
+            var session = new UserSession { UserId = user, RefreshTokenHash = Guid.NewGuid().ToString(),
+                ExpiresAt = DateTime.UtcNow.AddDays(30) };
+            _db.Context.UserSessions.Add(session);
+            await _db.Context.SaveChangesAsync();
+            var key = Govor.Security.E2eeProtocol.PublicKey(user == _db.Alice ? privateKeys :
+                Govor.Security.E2eeProtocol.GenerateKeys(), user, session.Id);
+            await directory.RegisterAsync(user, session.Id, key);
+            devices.Add(key);
+        }
+        return Govor.Security.E2eeProtocol.Encrypt(new("hello", []), privateKeys, devices[0],
+            await directory.GetConversationKeysAsync(_db.Alice, _db.ChatId, Govor.Domain.Models.Messages.RecipientType.User), Guid.NewGuid());
     }
 
     [Test]

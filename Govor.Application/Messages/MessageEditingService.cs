@@ -5,6 +5,7 @@ using Govor.Domain.Models.Messages;
 using Govor.Application.Groups;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Govor.Application.E2ee;
 
 namespace Govor.Application.Messages;
 
@@ -107,9 +108,21 @@ public class MessageEditingService : IMessageEditingService
             MediaAttachments = message.MediaAttachments?.ToList() ?? []
         };
 
-        if (editParams.NewContent is null || editParams.NewContent.Length > 50_000 ||
+        if (editParams.NewContent is null || editParams.NewContent.Length > E2eeProtocol.MaxEnvelopeLength ||
             (string.IsNullOrWhiteSpace(editParams.NewContent) && message.MediaAttachments.Count == 0))
             return new EditMessageResult(false, new ArgumentException("Invalid message content."), null);
+
+        try
+        {
+            var envelope = await new E2eeService(_dbContext).ValidateAsync(editParams.NewContent,
+                editParams.EditorId, message.RecipientId, message.RecipientType, message.ReplyToMessageId,
+                message.MediaAttachments.Select(a => a.MediaFileId).ToArray(), message.Id);
+            if (E2eeProtocol.IsEncrypted(message.EncryptedContent) &&
+                (envelope is null || envelope.CreatedAt <= E2eeProtocol.Inspect(message.EncryptedContent).CreatedAt))
+                throw new ArgumentException("An encrypted message cannot be downgraded or replayed.");
+        }
+        catch (Exception ex) when (ex is ArgumentException or UnauthorizedAccessException or InvalidOperationException)
+        { return new EditMessageResult(false, ex, null); }
 
         message.EncryptedContent = editParams.NewContent;
         message.IsEdited = true;
