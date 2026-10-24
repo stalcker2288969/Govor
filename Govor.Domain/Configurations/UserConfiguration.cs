@@ -9,6 +9,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.HasKey(x => x.Id);
+        builder.Property(u => u.SrpSalt).HasMaxLength(64);
+        builder.Property(u => u.SrpIdentity).HasMaxLength(64);
+        builder.Property(u => u.SrpVerifier).HasMaxLength(1024);
+        builder.Property(u => u.CredentialVersion).IsConcurrencyToken();
         
         builder.HasIndex(u => u.Username).IsUnique();
         builder.HasIndex(u => u.CreatedOn);

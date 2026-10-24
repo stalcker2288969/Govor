@@ -797,6 +797,39 @@ namespace Govor.Domain.Migrations
                     b.ToTable("Admins");
                 });
 
+            modelBuilder.Entity("Govor.Domain.Models.Users.Crypto.E2eeIdentityChange", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Epoch")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ChangedAt")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("IdentityKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PreviousDeviceKeyJson")
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<string>("PreviousIdentityKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("PreviousSessionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("UserId", "Epoch");
+
+                    b.ToTable("E2eeIdentityChanges");
+                });
+
             modelBuilder.Entity("Govor.Domain.Models.Users.Crypto.E2eeRecoveryVault", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -807,10 +840,24 @@ namespace Govor.Domain.Migrations
                         .HasMaxLength(4000000)
                         .HasColumnType("character varying(4000000)");
 
+                    b.Property<long>("Epoch")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("IdentityKey")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PasswordCiphertext")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<long>("PasswordCredentialVersion")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PasswordSignature")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<long>("Revision")
                         .IsConcurrencyToken()
@@ -927,6 +974,10 @@ namespace Govor.Domain.Migrations
                     b.Property<DateOnly>("CreatedOn")
                         .HasColumnType("date");
 
+                    b.Property<long>("CredentialVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -941,6 +992,18 @@ namespace Govor.Domain.Migrations
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<string>("SrpIdentity")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SrpSalt")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SrpVerifier")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -1277,6 +1340,15 @@ namespace Govor.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Govor.Domain.Models.Users.Crypto.E2eeIdentityChange", b =>
+                {
+                    b.HasOne("Govor.Domain.Models.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Govor.Domain.Models.Users.Crypto.E2eeRecoveryVault", b =>

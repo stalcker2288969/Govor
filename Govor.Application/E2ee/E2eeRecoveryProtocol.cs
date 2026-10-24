@@ -49,6 +49,11 @@ public static class E2eeRecoveryProtocol
     public static string AccountFingerprint(string identity) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("govor-account-v1\n" + identity)));
 
+    public static string SignAccountPayload(string privateIdentity, byte[] data)
+    { using var key = PrivateIdentity(privateIdentity); return Sign(key, data); }
+    public static void VerifyAccountPayload(string publicIdentity, byte[] data, string signature)
+    { using var key = PublicIdentityKey(publicIdentity); Verify(key, data, signature); }
+
     public static DeviceKey Certify(DeviceKey device, string privateIdentity, long generation = 0,
         string? previousFingerprint = null)
     {

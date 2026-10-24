@@ -40,6 +40,13 @@ public sealed class E2eeController(
     [HttpGet("recovery")]
     public async Task<IActionResult> Recovery() => Ok(await e2ee.GetRecoveryAsync(user.GetCurrentUserId()));
 
+    [HttpGet("identities/{peer:guid}/changes")]
+    public async Task<IActionResult> IdentityChanges(Guid peer)
+    {
+        try { return Ok(await e2ee.GetIdentityChangesAsync(user.GetCurrentUserId(), peer)); }
+        catch (UnauthorizedAccessException) { return Forbid(); }
+    }
+
     [HttpGet("devices")]
     public async Task<IActionResult> Devices() => Ok(await e2ee.GetOwnDevicesAsync(user.GetCurrentUserId()));
 
@@ -55,12 +62,13 @@ public sealed class E2eeController(
     }
 
     [HttpGet("conversations/{type:int}/{conversationId:guid}/signers/{deviceSession:guid}")]
-    public async Task<IActionResult> HistoricalSigner(int type, Guid conversationId, Guid deviceSession)
+    public async Task<IActionResult> HistoricalSigner(int type, Guid conversationId, Guid deviceSession, [FromQuery] string identityKey = null)
     {
         if (type is < 0 or > 1) return BadRequest();
         try
         {
-            var key = await e2ee.GetHistoricalSignerAsync(user.GetCurrentUserId(), conversationId, (RecipientType)type, deviceSession);
+            if (identityKey?.Length > 1000) return BadRequest();
+            var key = await e2ee.GetHistoricalSignerAsync(user.GetCurrentUserId(), conversationId, (RecipientType)type, deviceSession, identityKey);
             return key is null ? NotFound() : Ok(key);
         }
         catch (UnauthorizedAccessException) { return Forbid(); }

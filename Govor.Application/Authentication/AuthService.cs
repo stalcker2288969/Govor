@@ -33,7 +33,16 @@ public class AuthService : IAccountService
         _clock = clock;
     }
     
-    public async Task<Result<User, Error>> RegistrationAsync(string name, string password, Invitation invitation)
+    public Task<Result<User, Error>> RegistrationAsync(string name, string password, Invitation invitation) =>
+        RegisterCoreAsync(name, password, invitation, null);
+
+    public Task<Result<User, Error>> RegistrationWithPasswordProofAsync(string name, PasswordCredentials credentials, Invitation invitation)
+    {
+        PasswordProtocol.Validate(credentials);
+        return RegisterCoreAsync(name, null, invitation, credentials);
+    }
+
+    private async Task<Result<User, Error>> RegisterCoreAsync(string name, string? password, Invitation invitation, PasswordCredentials? credentials)
     {
         var validationResult = _usernameValidator.Validate(name);
         if (validationResult.IsFailure)
@@ -48,7 +57,7 @@ public class AuthService : IAccountService
                 $"User with username '{name}' already exists."));
         }
         
-        var passwordHash = _passwordHasher.Hash(password);
+        var passwordHash = credentials is null ? _passwordHasher.Hash(password!) : "srp-only";
         
         var operationId = Guid.NewGuid();
         return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
@@ -81,7 +90,9 @@ public class AuthService : IAccountService
                 var user = new User
                 {
                     Id = operationId, Username = name, PasswordHash = passwordHash, Description = string.Empty,
-                    CreatedOn = DateOnly.FromDateTime(now), IconId = Guid.Empty, WasOnline = now, InviteId = invitation.Id
+                    CreatedOn = DateOnly.FromDateTime(now), IconId = Guid.Empty, WasOnline = now, InviteId = invitation.Id,
+                    SrpSalt = credentials?.Salt, SrpIdentity = credentials?.Identity, SrpVerifier = credentials?.Verifier,
+                    CredentialVersion = credentials is null ? 0 : 1
                 };
                 
                 await _context.Users.AddAsync(user);
@@ -120,6 +131,8 @@ public class AuthService : IAccountService
                 $"User '{name}' is not registered."));
         }
         
+        if (user.SrpVerifier is not null)
+            return Result.Failure<User>(Error.Unauthorized("Auth.PasswordProofRequired", "Use password proof authentication with an updated client."));
         if (!_passwordHasher.Verify(password, user.PasswordHash))
         {
             return Result.Failure<User>(Error.Failure(

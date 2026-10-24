@@ -105,6 +105,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization(); 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("password-auth", context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+        { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
 
 builder.Services.AddControllers();
 
@@ -175,6 +182,7 @@ app.UseSwaggerUI();
 //app.UseHttpsRedirection();
 
 app.UseRouting();
+app.UseRateLimiter();
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();

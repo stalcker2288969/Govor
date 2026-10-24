@@ -15,6 +15,8 @@ public class E2eeRecoveryVaultConfiguration : IEntityTypeConfiguration<E2eeRecov
         b.Property(v => v.IdentityKey).HasMaxLength(200);
         b.Property(v => v.Signature).HasMaxLength(100);
         b.Property(v => v.Ciphertext).HasMaxLength(4_000_000);
+        b.Property(v => v.PasswordCiphertext).HasMaxLength(4096);
+        b.Property(v => v.PasswordSignature).HasMaxLength(100);
         b.HasOne<User>().WithOne().HasForeignKey<E2eeRecoveryVault>(v => v.UserId).OnDelete(DeleteBehavior.Cascade);
     }
 }

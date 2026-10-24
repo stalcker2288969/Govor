@@ -33,6 +33,19 @@ public class UsersService : IUsersAdministration
             return;
 
         user.PasswordHash = _passwordHasher.Hash(password);
+        user.SrpVerifier = null;
+        user.SrpSalt = null;
+        user.SrpIdentity = null;
+        user.CredentialVersion++;
+        var recovery = await _context.E2eeRecoveryVaults.SingleOrDefaultAsync(v => v.UserId == userId);
+        if (recovery is not null)
+        {
+            // An administrator can reset authentication, but cannot rewrap an
+            // encryption key without knowing a client-side recovery secret.
+            recovery.PasswordCiphertext = null;
+            recovery.PasswordSignature = null;
+            recovery.PasswordCredentialVersion = 0;
+        }
 
         var sessions = await _context.UserSessions.Where(s => s.UserId == userId && !s.IsRevoked).ToListAsync();
         foreach (var session in sessions)

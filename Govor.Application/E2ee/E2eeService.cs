@@ -111,6 +111,19 @@ public sealed class E2eeService(GovorDbContext context)
         return new(value is null ? null : new(user, value.Revision, value.IdentityKey, value.Ciphertext, value.Signature));
     }
 
+    public async Task<Govor.Application.Authentication.AccountIdentityChange[]> GetIdentityChangesAsync(Guid user, Guid peer)
+    {
+        if (user != peer && !await context.PrivateChats.AnyAsync(c =>
+                (c.UserAId == user && c.UserBId == peer) || (c.UserAId == peer && c.UserBId == user)) &&
+            !await context.GroupMemberships.AnyAsync(m => m.UserId == user && !m.IsBanned &&
+                (context.GroupMemberships.Any(p => p.GroupId == m.GroupId && p.UserId == peer && !p.IsBanned) ||
+                 context.Messages.Any(msg => msg.RecipientType == RecipientType.Group && msg.RecipientId == m.GroupId && msg.SenderId == peer))))
+            throw new UnauthorizedAccessException();
+        return await context.E2eeIdentityChanges.AsNoTracking().Where(c => c.UserId == peer).OrderBy(c => c.Epoch)
+            .Select(c => new Govor.Application.Authentication.AccountIdentityChange(c.UserId, c.Epoch,
+                c.PreviousIdentityKey, c.IdentityKey, c.ChangedAt)).ToArrayAsync();
+    }
+
     public async Task<RecoveryVault> SaveRecoveryAsync(Guid user, SaveRecoveryVault request)
     {
         if (request.ExpectedRevision < 0 || request.ExpectedRevision == long.MaxValue)
@@ -166,14 +179,31 @@ public sealed class E2eeService(GovorDbContext context)
         await context.SaveChangesAsync();
     }
 
-    public async Task<DeviceKey?> GetHistoricalSignerAsync(Guid user, Guid conversation, RecipientType type, Guid session)
+    public async Task<DeviceKey?> GetHistoricalSignerAsync(Guid user, Guid conversation, RecipientType type, Guid session, string? identityKey = null)
     {
         if (!await context.HasChatAccessAsync(user, conversation, type)) throw new UnauthorizedAccessException();
         var crypto = await context.UserCryptoSessions.AsNoTracking().Include(c => c.SignedPreKey).Include(c => c.UserSession)
             .SingleOrDefaultAsync(c => c.UserSessionId == session);
-        if (crypto is null || !await context.Messages.AnyAsync(m => m.RecipientId == conversation &&
-                m.RecipientType == type && m.SenderId == crypto.UserSession.UserId)) return null;
-        return ToDeviceKey(crypto);
+        var owner = await context.UserSessions.AsNoTracking().Where(s => s.Id == session).Select(s => (Guid?)s.UserId).SingleOrDefaultAsync();
+        if (owner is null || !await context.Messages.AnyAsync(m => m.RecipientId == conversation &&
+                m.RecipientType == type && m.SenderId == owner.Value)) return null;
+        if (crypto is not null)
+        {
+            var current = ToDeviceKey(crypto);
+            if (identityKey is null || current.IdentityKey == identityKey) return current;
+        }
+        // A reset replaces this session's signing key, but v1 messages still need
+        // the former account certificate. Public history never reactivates a key.
+        var previous = await context.E2eeIdentityChanges.AsNoTracking().Where(c => c.UserId == owner.Value &&
+                c.PreviousSessionId == session && c.PreviousDeviceKeyJson != null)
+            .OrderByDescending(c => c.Epoch).Select(c => c.PreviousDeviceKeyJson!).ToArrayAsync();
+        foreach (var json in previous)
+        {
+            var key = System.Text.Json.JsonSerializer.Deserialize<DeviceKey>(json, E2eeProtocol.Json);
+            if (key is not null && key.SessionId == session && key.UserId == owner &&
+                (identityKey is null || key.IdentityKey == identityKey)) return key;
+        }
+        return null;
     }
 
     public async Task<EncryptedMessage?> ValidateAsync(string content, Guid sender, Guid conversation,

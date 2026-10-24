@@ -33,6 +33,8 @@ public static class ConfigurationProgramExtensions
     public static void AddServices(this IServiceCollection services)
     {
         services.AddScoped<Govor.Application.E2ee.E2eeService>();
+        services.AddSingleton<PasswordChallenges>();
+        services.AddScoped<PasswordAccountService>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<IUsernameValidator, UsernameValidator>();
         services.AddSingleton<IJwtTokenHasher, JwtTokenHasher>();
