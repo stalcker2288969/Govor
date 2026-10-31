@@ -322,6 +322,15 @@ namespace Govor.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("ForwardedFromMessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ForwardedFromSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ForwardedFromUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsEdited")
                         .HasColumnType("boolean");
 
@@ -1027,6 +1036,27 @@ namespace Govor.Domain.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("Govor.Domain.Models.Users.UserBenefits", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Privileges")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("TagJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserBenefits");
+                });
+
             modelBuilder.Entity("Govor.Domain.Models.Users.UserPushToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1402,6 +1432,15 @@ namespace Govor.Domain.Migrations
                         .IsRequired();
 
                     b.Navigation("Invite");
+                });
+
+            modelBuilder.Entity("Govor.Domain.Models.Users.UserBenefits", b =>
+                {
+                    b.HasOne("Govor.Domain.Models.Users.User", null)
+                        .WithOne()
+                        .HasForeignKey("Govor.Domain.Models.Users.UserBenefits", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Govor.Domain.Models.Users.UserSession", b =>

@@ -153,6 +153,45 @@ public class E2eeTests
     }
 
     [Test]
+    public async Task ForwardRequiresFreshEncryptionForDestinationAndRetryKeepsAttribution()
+    {
+        var sender = new MessageSendingService(_db.Context, NullLogger<MessageSendingService>.Instance);
+        var source = await sender.SendMessageAsync(new(await Encrypt(), null, _db.ChatId, RecipientType.User, _db.Alice, DateTime.UtcNow, []));
+        var destination = Guid.NewGuid();
+        _db.Context.PrivateChats.Add(new PrivateChat { Id = destination, UserAId = _db.Alice, UserBId = _db.Outsider });
+        await _db.Context.SaveChangesAsync();
+        await Register(_db.Outsider, _other);
+        var replay = await sender.SendMessageAsync(new(source.Message.EncryptedContent, null, destination,
+            RecipientType.User, _db.Alice, DateTime.UtcNow, [], source.Message.Id));
+        Assert.That(replay.IsSuccess, Is.False);
+        var ciphertext = await Encrypt(conversation: destination);
+        var request = new SendMessage(ciphertext, null, destination, RecipientType.User, _db.Alice, DateTime.UtcNow, [], source.Message.Id);
+        var forwarded = await sender.SendMessageAsync(request);
+        Assert.That(forwarded.IsSuccess, Is.True);
+        Assert.That(forwarded.Message.ForwardedFromMessageId, Is.EqualTo(source.Message.Id));
+        Assert.That((await sender.SendMessageAsync(request)).Message.Id, Is.EqualTo(forwarded.Message.Id));
+        Assert.That((await sender.SendMessageAsync(request with { ForwardedFromMessageId = null })).IsSuccess, Is.False);
+        Assert.That(E2eeProtocol.Decrypt(ciphertext, _other, forwarded.Message.Id, destination, 0, _db.Alice).Text,
+            Is.EqualTo("секретное сообщение"));
+        Assert.Throws<CryptographicException>(() => E2eeProtocol.Decrypt(ciphertext, _bob, forwarded.Message.Id, destination, 0, _db.Alice));
+        Assert.That(await _db.Context.Messages.CountAsync(), Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task EncryptedReplyBindsReplyTargetToSignedEnvelope()
+    {
+        var sender = new MessageSendingService(_db.Context, NullLogger<MessageSendingService>.Instance);
+        var source = await sender.SendMessageAsync(new(await Encrypt(), null, _db.ChatId, RecipientType.User, _db.Alice, DateTime.UtcNow, []));
+        var ciphertext = E2eeProtocol.Encrypt(new("ответ", []), _bob, _b,
+            await _e2ee.GetConversationKeysAsync(_db.Bob, _db.ChatId, RecipientType.User), Guid.NewGuid(), replyTo: source.Message.Id);
+        var request = new SendMessage(ciphertext, source.Message.Id, _db.ChatId, RecipientType.User, _db.Bob, DateTime.UtcNow, []);
+        Assert.That((await sender.SendMessageAsync(request with { ReplyToMessageId = null })).IsSuccess, Is.False);
+        var sent = await sender.SendMessageAsync(request);
+        Assert.That(sent.IsSuccess, Is.True);
+        Assert.That(sent.Message.ReplyToMessageId, Is.EqualTo(source.Message.Id));
+    }
+
+    [Test]
     public async Task NewDeviceMakesOldRecipientManifestInvalid()
     {
         var ciphertext = await Encrypt();

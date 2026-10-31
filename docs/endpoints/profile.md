@@ -16,14 +16,12 @@ UserProfileDto: id, username, description (nullable), iconId (nullable), isOnlin
 
 ## Ограничения
 
-REST UploadAvatar не рассылает AvatarUpdated. Клиентам может потребоваться отдельное обновление данных. В ProfileHub.SetAvatar проверяется существование файла, но не его загрузчик/тип/владелец.
+REST UploadAvatar не рассылает AvatarUpdated. Клиентам может потребоваться отдельное обновление данных. ProfileHub.SetAvatar и ProfileService проверяют, что файл загружен текущим пользователем с OwnerType.Avatar. Чужое вложение нельзя назначить аватаром.
 
-Хаб игнорирует Result от SetDescription и SetNewIcon, поэтому успех true не всегда подтверждает изменение. MappingProfile дважды регистрирует UserProfile → UserProfileDto; это нужно устранить и проверить isOnline.
+Хаб проверяет Result от SetDescription и SetNewIcon: при сервисной ошибке возвращает ошибку HubResult и не рассылает успешное изменение.
 
 Чтение чужого профиля не применяет PrivacyUserSettings. Наличие моделей приватности не означает действующую политику доступа.
 
----
-Проверено по исходникам на 03.10.2026, commit `4603be9`. Описано текущее поведение; успешная сборка не означает проверку работающего сервера.
 
-Источник: [Govor.API/Controllers/ProfileController.cs](https://github.com/Govor-team/Govor/blob/4603be9f714135e0af72d505d17f3d1709834bea/Govor.API/Controllers/ProfileController.cs).
+Источник: [Govor.API/Controllers/ProfileController.cs](https://github.com/stalcker2288969/Govor/blob/a3401ceedf30c2eb6167f7ef6e4ae820883d2de2/Govor.API/Controllers/ProfileController.cs).
 

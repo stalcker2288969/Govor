@@ -128,6 +128,7 @@ public static class ConfigurationProgramExtensions
         services.AddScoped<IOneTimePreKeysRotator, OneTimePreKeysRotator>();
         
         services.AddScoped<IProfileService, ProfileService>();
+        services.AddScoped<UserBenefitsService>();
     }
 
     public static void AddGovorDbContext(this IServiceCollection services, IConfiguration configuration)

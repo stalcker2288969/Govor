@@ -1,30 +1,24 @@
-# School Messenger (ASP.NET Core WebAPI)
+# Govor
 
-A simple real-time messenger built with ASP.NET Core Web API + Entity Framework Core.  
-This is my school project that I'm working on in my free time to level up my backend development skills.
+Сервер мессенджера на ASP.NET Core **.NET 10**: PostgreSQL/EF Core, JWT, SignalR, Firebase и локальное хранилище файлов. Клиент .NET MAUI разрабатывается в отдельном репозитории.
 
-## Current Features
-- Registration and authentication (JWT)
-- Creating private chats and real-time messaging (via SignalR)
-- Sending text messages and images
-- User profiles with avatars
-- Basic admin panel (still under development)
+Реализованы регистрация по приглашению, SRP-вход и управление сессиями, друзья, личные чаты, группы/каналы, сообщения и вложения с E2EE, восстановление истории, реакции, прочтение и очередь push.
 
-(The list will be updated as new features are added)
+Начните с [документации](docs/README.md), [локального запуска](docs/getting-started.md) и [карты HTTP API](docs/api-reference.md). Публичный [GitBook](https://nas-3.gitbook.io/govor-api) содержит руководства и справочник; сведения о синхронизации — в [правилах актуализации](docs/server-fixes.md).
 
-## Tech Stack
-- Backend: ASP.NET Core 8 Web API
-- Database: PostgreSQL or Microsoft SQL Server (configurable via appsettings)
-- Authentication: JWT + Refresh Tokens
-- Real-time communication: SignalR
-- Frontend (separate project for now): .NET MAUI (cross-platform desktop/mobile client)
+## Проверка сервера
 
-dock: https://nas-3.gitbook.io/govor-api
+```powershell
+dotnet restore Govor.Server.slnx
+dotnet test Govor.Server.slnx -c Release
+```
 
-Deployment: [Timeweb VPS + GitHub Actions](docs/vps-deployment.md) · [Timeweb App Platform](docs/timeweb-deployment.md).
+Тесты по умолчанию используют изолированную SQLite. [Полное руководство](docs/testing.md) · [Устройство тестовых проектов](tests/README.md).
 
-## Server tests
+## Развёртывание
 
-Run all current server tests with `dotnet test Govor.Server.slnx -c Release`.
-See [tests/README.md](tests/README.md) for the project layout, PostgreSQL setup,
-coverage commands and validation limits.
+[Выбор схемы](docs/deployment.md) · [Timeweb VPS + GitHub Actions](docs/vps-deployment.md) · [Timeweb App Platform](docs/timeweb-deployment.md).
+
+Секреты задаются в runtime, миграции применяются отдельным запуском `--migrate-only`, uploads требует постоянного хранилища. [Конфигурация](docs/configuration.md) · [Резервные копии](docs/operations.md).
+
+Границы шифрования и доверия описаны в [E2EE](docs/e2ee.md); протокол не предоставляет FS/PCS и не является реализацией Signal/MLS.

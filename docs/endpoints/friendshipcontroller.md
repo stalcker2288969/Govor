@@ -24,7 +24,5 @@ Bearer token обязателен; отдельная роль в атрибут
 
 Статус isOnline зависит от состояния процесса и подключения к presence. Он не является гарантией доставки сообщений или фоновой доступности устройства.
 
----
-Проверено по исходникам на 03.10.2026, commit `4603be9`. Описано текущее поведение; успешная сборка не означает проверку работающего сервера.
 
-Источник: [Govor.API/Controllers/Friends/FriendshipController.cs](https://github.com/Govor-team/Govor/blob/4603be9f714135e0af72d505d17f3d1709834bea/Govor.API/Controllers/Friends/FriendshipController.cs).
+Источник: [Govor.API/Controllers/Friends/FriendshipController.cs](https://github.com/stalcker2288969/Govor/blob/a3401ceedf30c2eb6167f7ef6e4ae820883d2de2/Govor.API/Controllers/Friends/FriendshipController.cs).

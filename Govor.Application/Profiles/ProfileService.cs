@@ -39,6 +39,7 @@ public class ProfileService : IProfileService
             return Result.Failure<UserProfile>(CreateNotFoundError(userId));
         }
         
+        profile.Benefits = await new UserBenefitsService(_context).GetAsync(userId);
         return profile;
     }
 

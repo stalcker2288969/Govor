@@ -1,33 +1,19 @@
-# Ключи сессий — экспериментальный API
+# Старый API prekeys
 
-RequireHttps и роль User/Admin обязательны.
+Эти маршруты сохранены для совместимости и отличаются от действующего [API E2EE устройств](e2ee.md). Они сами по себе не реализуют Signal Protocol, ratchet или архив истории.
+
+Требуются HTTPS, access token и роль User/Admin.
 
 | Метод | Маршрут | Назначение |
 | --- | --- | --- |
-| POST | /api/session/keys | Привязать публичные ключи текущей сессии |
-| GET | /api/session/users/{userId}/keys | Получить ключи друга |
-| POST | /api/session/keys/rotate | Пополнить одноразовые ключи |
-| GET | /api/session/keys/remaining | { remaining: число } |
-| POST | /api/session/keys/{preKeyId}/used | Пометить собственный ключ использованным |
+| POST | `/api/session/keys` | Привязать ключи текущей сессии |
+| GET | `/api/session/users/{userId}/keys` | Публичные ключи друга |
+| POST | `/api/session/keys/rotate` | Пополнить одноразовые ключи |
+| GET | `/api/session/keys/remaining` | `{ remaining }` |
+| POST | `/api/session/keys/{preKeyId}/used` | Пометить собственный ключ использованным |
 
-byte[] в JSON передаются строкой base64. UploadKeysRequest содержит identityKey, signedPreKey, signedPreKeySignature и oneTimePreKeys (массив base64). За запрос допускается максимум 100 одноразовых ключей. Сервис запрещает повторную привязку ключей к сессии и проверяет владельца.
+`byte[]` передаются в JSON как Base64. `UploadKeysRequest`: `identityKey`, `signedPreKey`, `signedPreKeySignature`, `oneTimePreKeys`. За upload или rotate допускается до 100 новых prekeys. Rotate получает `newOneTimePreKeys`.
 
-RotateOneTimePreKeysRequest содержит newOneTimePreKeys. В реализации ротация удаляет использованные записи и добавляет новые, не ограничивая общий размер набора.
+Сервис проверяет владельца сессии; повторная привязка запрещена. Reader возвращает публичные DTO со `signedPreKey` и неиспользованными `oneTimePreKeys`, без внутренних данных UserSession. Конструктор rotator исправлен; прежняя ошибка null больше не описывает текущий сервер.
 
-## Неработающие и небезопасные части
-
-_oneTimePreKeysRotator не передан в конструктор SessionKeysController: rotate и used падают при обращении к null.
-
-remaining считает все записи, включая IsUsed. Reader выдаёт все OneTimePreKeys и возвращает EF-сущности UserCryptoSession вместо PublicSessionKeysDto. Include(UserSession) может включить внутренние поля, а двусторонние навигации могут привести к циклу сериализации. SignedPreKey не включён явным Include.
-
-Доступ к чужим ключам ограничен дружбой, но Forbid("текст") ошибочно используется как имя authentication scheme. Атомарной выдачи одного неиспользованного prekey потребителю нет: endpoint used относится к текущей сессии владельца.
-
-## Статус E2EE
-
-Это заготовка хранения ключей, не законченный криптографический протокол. Нет доказанной реализации обмена/проверки подписей, одноразового потребления, ratchet и поддержки шифрования на клиенте. Не используйте этот раздел как обещание сквозного шифрования.
-
----
-Проверено по исходникам на 03.10.2026, commit `4603be9`. Описано текущее поведение; успешная сборка не означает проверку работающего сервера.
-
-Источник: [Govor.API/Controllers/Authentication/SessionKeysController.cs](https://github.com/Govor-team/Govor/blob/4603be9f714135e0af72d505d17f3d1709834bea/Govor.API/Controllers/Authentication/SessionKeysController.cs).
-
+`used` относится к сессии владельца, а не к атомарной выдаче ключа произвольному собеседнику. Не стройте новый E2EE-клиент на предположении, что это законченный протокол одноразового обмена. За reverse proxy учитывайте [RequireHttps и forwarded headers](../configuration.md).

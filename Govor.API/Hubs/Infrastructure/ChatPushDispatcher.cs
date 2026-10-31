@@ -40,7 +40,10 @@ public class ChatPushDispatcher(GovorDbContext context, IChatNotificationService
                     {
                         MessageId = m.Id, SenderId = m.SenderId, RecipientId = m.RecipientId,
                         RecipientType = m.RecipientType, EncryptedContent = m.EncryptedContent,
-                        SentAt = m.SentAt, ReplyToMessageId = m.ReplyToMessageId
+                        SentAt = m.SentAt, ReplyToMessageId = m.ReplyToMessageId,
+                        ForwardedFromMessageId = m.ForwardedFromMessageId,
+                        ForwardedFromUserId = m.ForwardedFromUserId,
+                        ForwardedFromSentAt = m.ForwardedFromSentAt
                     }).FirstOrDefaultAsync(cancellationToken);
                 delivered = message is null || await notifier.DeliverPushAsync(message);
             }

@@ -312,7 +312,8 @@ public class ChatsHub : Hub
             RecipientType: request.RecipientType,
             SendAt: _nowDateTimeProvider.Now,
             Media: request.MediaAttachments?.Select(f => new SendMedia(f.MediaId, f.EncryptedKey)) 
-                   ?? Array.Empty<SendMedia>()
+                   ?? Array.Empty<SendMedia>(),
+            ForwardedFromMessageId: request.ForwardedFromMessageId
         );
     }
 
@@ -328,7 +329,10 @@ public class ChatsHub : Hub
             SentAt = message.SentAt,
             IsEdited = false,
             MediaAttachments = message.MediaAttachments.Select(m => m.MediaFile).ToList(),
-            ReplyToMessageId = replyToId
+            ReplyToMessageId = replyToId,
+            ForwardedFromMessageId = message.ForwardedFromMessageId,
+            ForwardedFromUserId = message.ForwardedFromUserId,
+            ForwardedFromSentAt = message.ForwardedFromSentAt
         };
     }
 }

@@ -71,10 +71,21 @@ public class MessageSendingService : IMessageSendingService
             return completed.SenderId == sendParams.FromUserId && completed.EncryptedContent == sendParams.EncryptContent &&
                 completed.RecipientId == sendParams.RecipientId && completed.RecipientType == sendParams.RecipientType &&
                 completed.ReplyToMessageId == sendParams.ReplyToMessageId &&
+                completed.ForwardedFromMessageId == sendParams.ForwardedFromMessageId &&
                 completed.MediaAttachments.Select(a => a.MediaFileId).Order().SequenceEqual(media.Select(a => a.MediaId).Order()) &&
                 (!E2eeProtocol.IsEncrypted(sendParams.EncryptContent) || media.All(m => string.IsNullOrEmpty(m.EncryptedKey)))
                 ? new SendMessageResult(true, null, completed)
                 : new SendMessageResult(false, new ArgumentException("Message ID already exists."), default);
+
+        Message? source = null;
+        if (sendParams.ForwardedFromMessageId is { } sourceId)
+        {
+            source = await _dbContext.Messages.AsNoTracking().SingleOrDefaultAsync(m => m.Id == sourceId);
+            if (source is null || !await _dbContext.HasChatAccessAsync(sendParams.FromUserId,
+                    source.RecipientId, source.RecipientType))
+                return new SendMessageResult(false, new UnauthorizedAccessException("Forward source is unavailable."), default);
+            // E2EE validation below binds the fresh envelope to its destination; attachments require owned uploads.
+        }
 
         var mediaIds = media.Select(m => m.MediaId).Distinct().ToArray();
         var files = await _dbContext.MediaFiles.Where(m => mediaIds.Contains(m.Id) &&
@@ -111,6 +122,9 @@ public class MessageSendingService : IMessageSendingService
             SentAt = sendParams.SendAt,
             IsEdited = false,
             ReplyToMessageId = sendParams.ReplyToMessageId,
+            ForwardedFromMessageId = source?.Id,
+            ForwardedFromUserId = source?.SenderId,
+            ForwardedFromSentAt = source?.SentAt,
             MediaAttachments = files.Select(file => new MediaAttachments
             {
                 Id = Guid.NewGuid(),

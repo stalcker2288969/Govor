@@ -13,6 +13,9 @@ public class MessageResponse
     public bool IsEdited { get; set; } = false;
     public DateTime? EditedAt { get; set; }
     public Guid? ReplyToMessageId { get; set; }
+    public Guid? ForwardedFromMessageId { get; set; }
+    public Guid? ForwardedFromUserId { get; set; }
+    public DateTime? ForwardedFromSentAt { get; set; }
     public long ReactionsVersion { get; set; }
     
     public List<MediaAttachmentResponse> MediaAttachments { get; set; } = new();

@@ -1,19 +1,12 @@
-# HTTP-присутствие — ограничения
+# Присутствие через HTTP
 
-Требуется роль User/Admin.
+Требуются access token и роль User/Admin. Историческое имя файла сохранено для совместимости ссылок; endpoint status работает в текущей версии.
 
-| Метод | Маршрут | Текущее поведение |
+| Метод | Маршрут | Ответ |
 | --- | --- | --- |
-| PATCH | /api/online/ping | Вызывает PingHandlerService, успех 200 без тела |
-| GET | /api/online/status/{userId} | Неработоспособен: 500 |
+| PATCH | `/api/online/ping` | Обновить lastSeen текущего пользователя; 200 без тела |
+| GET | `/api/online/status/{userId}` | 200, `{ isOnline, lastSeen }` |
 
-В конструкторе не присваиваются _userOnlineStore и _presenceReader. GetStatus обращается к null; catch возвращает 500 "Internal server error.".
+isOnline определяется OnlineUserStore, lastSeen читается из сохранённого пользовательского состояния. Отсутствующие ранее зависимости конструктора исправлены. Исключение сервиса даёт 500, это не штатный ответ status.
 
-Задуманное тело status — { isOnline, lastSeen }, но сейчас его нельзя считать рабочим контрактом.
-
-Для событий online/offline подключайтесь к /hubs/presence. Ping и наличие SignalR-подключения — разные механизмы; требуется единая политика lastSeen/TTL. Не считайте HTTP ping подтверждением активного presence-соединения.
-
----
-Проверено по исходникам на 03.10.2026, commit `4603be9`. Описано текущее поведение; успешная сборка не означает проверку работающего сервера.
-
-Источник: [Govor.API/Controllers/OnlinePingingController.cs](https://github.com/Govor-team/Govor/blob/4603be9f714135e0af72d505d17f3d1709834bea/Govor.API/Controllers/OnlinePingingController.cs).
+Для событий подключайтесь к [PresenceHub](../signalr/presencehub.md). HTTP ping и наличие presence-соединения — разные механизмы: ping не создаёт SignalR online. OnlineUserStore находится в памяти одного процесса; после перезапуска и на нескольких экземплярах состояние не является общим.

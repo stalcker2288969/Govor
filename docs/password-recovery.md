@@ -117,6 +117,8 @@ epoch. Журнал доступен самому аккаунту и собес
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
 $env:ConnectionStrings__GovorDbContext = 'Host=127.0.0.1;Port=5432;Database=govor_dev;Username=postgres;Password=YOUR_LOCAL_PASSWORD'
 $env:Firebase__Enabled = 'false'
+$env:JwtAccessOption__SecretKey = 'local-development-signing-key-change-before-deployment'
+$env:EncryptionOption__Secret = 'local-development-refresh-secret-change-before-deployment'
 dotnet restore Govor.API/Govor.API.csproj
 dotnet run --project Govor.API/Govor.API.csproj --no-launch-profile -- --migrate-only
 dotnet run --project Govor.API/Govor.API.csproj --launch-profile http

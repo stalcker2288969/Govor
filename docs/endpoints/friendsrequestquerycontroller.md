@@ -20,7 +20,5 @@ FriendshipStatus сериализуется числом: Pending=0, Accepted=1,
 
 При отсутствии записей — пустой массив. Ошибки контроллера — 500 с {"error":"Internal server error."}. Для восстановления после reconnect перечитайте списки: события не являются журналом гарантированной доставки.
 
----
-Проверено по исходникам на 03.10.2026, commit `4603be9`. Описано текущее поведение; успешная сборка не означает проверку работающего сервера.
 
-Источник: [Govor.API/Controllers/Friends/FriendsRequestQueryController.cs](https://github.com/Govor-team/Govor/blob/4603be9f714135e0af72d505d17f3d1709834bea/Govor.API/Controllers/Friends/FriendsRequestQueryController.cs).
+Источник: [Govor.API/Controllers/Friends/FriendsRequestQueryController.cs](https://github.com/stalcker2288969/Govor/blob/a3401ceedf30c2eb6167f7ef6e4ae820883d2de2/Govor.API/Controllers/Friends/FriendsRequestQueryController.cs).

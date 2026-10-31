@@ -11,6 +11,7 @@ namespace Govor.Domain;
 public class GovorDbContext(DbContextOptions<GovorDbContext> options) : DbContext(options)
 {
     public virtual DbSet<User> Users { get; set; }
+    public DbSet<UserBenefits> UserBenefits { get; set; }
     public virtual DbSet<UserSession> UserSessions { get; set; }
     public virtual DbSet<UserPushToken>  UserPushTokens { get; set; }
     public virtual DbSet<UserCryptoSession> UserCryptoSessions { get; set; }
@@ -43,6 +44,13 @@ public class GovorDbContext(DbContextOptions<GovorDbContext> options) : DbContex
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<UserBenefits>(b =>
+        {
+            b.HasKey(x => x.UserId);
+            b.Property(x => x.Revision).IsConcurrencyToken();
+            b.Property(x => x.TagJson).HasMaxLength(4000);
+            b.HasOne<User>().WithOne().HasForeignKey<UserBenefits>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.Entity<E2eeIdentityChange>(b =>
         {
             b.HasKey(c => new { c.UserId, c.Epoch });

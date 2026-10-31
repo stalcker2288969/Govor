@@ -518,12 +518,12 @@ public partial class ReadApiTests
         Assert.That((await _client.GetAsync($"/api/groups/{id}")).StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
     }
 
-    private async Task<TestHubConnection> ConnectHubAsync()
+    private async Task<TestHubConnection> ConnectHubAsync(string path = "/hubs/chats")
     {
         var client = _factory.Server.CreateWebSocketClient();
         var authorization = _client.DefaultRequestHeaders.Authorization;
         client.ConfigureRequest = request => request.Headers.Authorization = authorization!.ToString();
-        var connection = new TestHubConnection(await client.ConnectAsync(new Uri("ws://localhost/hubs/chats"), CancellationToken.None));
+        var connection = new TestHubConnection(await client.ConnectAsync(new Uri("ws://localhost" + path), CancellationToken.None));
         await connection.SendAsync("{\"protocol\":\"json\",\"version\":1}");
         Assert.That((await connection.ReadAsync()).EnumerateObject().Count(), Is.Zero);
         // A completion proves OnConnectedAsync has finished joining the session group.

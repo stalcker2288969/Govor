@@ -13,6 +13,17 @@ public class FriendshipService : IFriendshipService
     {
         _context = context;
     }
+
+    public async Task RemoveFriendAsync(Guid userId, Guid currentUserId)
+    {
+        if (userId == Guid.Empty || currentUserId == Guid.Empty || userId == currentUserId)
+            throw new ArgumentException("Two distinct users are required.");
+        // A removal must never clear a block or cancel a pending request.
+        await _context.Friendships.Where(f => f.Status == FriendshipStatus.Accepted &&
+            ((f.RequesterId == userId && f.AddresseeId == currentUserId) ||
+             (f.RequesterId == currentUserId && f.AddresseeId == userId)))
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.Status, FriendshipStatus.Rejected));
+    }
     
     public async Task<List<User>> SearchUsersAsync(string query, Guid currentId)
     {

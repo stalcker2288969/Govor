@@ -11,5 +11,6 @@ public record MessageRequest
     [MaxLength(1_000_000, ErrorMessage = "EncryptedContent cannot exceed 1,000,000 characters.")]
     public string EncryptedContent { get; init; } = string.Empty;
     public Guid? ReplyToMessageId { get; set; }
+    public Guid? ForwardedFromMessageId { get; init; }
     public List<MediaReference> MediaAttachments { get; set; } = new();
 }

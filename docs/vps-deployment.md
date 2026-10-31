@@ -166,7 +166,7 @@ SignalR. Чтобы проверить сохранность, запишите 
 восстановления БД. Старые образы и каталоги релизов автоматически не очищаются.
 
 Официальные инструкции:
-- https://docs.docker.com/engine/install/ubuntu/
-- https://docs.docker.com/engine/storage/bind-mounts/
-- https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images
-- https://caddyserver.com/docs/quick-starts/reverse-proxy
+- [Установка Docker Engine](https://docs.docker.com/engine/install/ubuntu/)
+- [Постоянные bind mounts](https://docs.docker.com/engine/storage/bind-mounts/)
+- [Публикация образов GitHub Actions](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)
+- [Reverse proxy Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy)

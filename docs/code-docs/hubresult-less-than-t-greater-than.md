@@ -11,7 +11,8 @@ ResultExtensions преобразует Result<T, Error>: успешный T →
 | Conflict | 409 |
 | Unauthorized | 401 |
 | Forbidden | 403 |
-| Остальные, включая ServerError | 400 (текущий дефект mapping) |
+| ServerError | 500 |
+| Прочие Failure | 400 |
 
 Сервисная ошибка:
 
@@ -21,7 +22,7 @@ ResultExtensions преобразует Result<T, Error>: успешный T →
 
 errors добавляется при наличии. Автоматическая MVC-валидация, middleware авторизации и ручные BadRequest/StatusCode могут возвращать другую форму. Единого тела ошибки для всех маршрутов сейчас нет.
 
-В контроллерах встречается Forbid(ex.Message): строка трактуется как authentication scheme, а не тело ответа; результат может быть 500 вместо 403.
+Ручной Forbid возвращает отказ без гарантированного JSON-тела. SRP/E2EE-контроллеры также возвращают строки и пустые ответы. Обрабатывайте статус и Content-Type до разбора тела.
 
 ## SignalR HubResult<T>
 
@@ -29,11 +30,11 @@ errors добавляется при наличии. Автоматическа�
 {"status":200,"result":null,"errorMessage":null}
 ```
 
-status — число внутри ответа команды, не HTTP-статус соединения. Значения: 200 Success, 201 Created, 204 NoContent, 400 BadRequest, 401 Unauthorized, 404 NotFound, 409 Conflict, 422 UnprocessableEntity, 500 ServerError.
+status — число внутри ответа команды, не HTTP-статус соединения. Значения: 200 Success, 201 Created, 204 NoContent, 400 BadRequest, 401 Unauthorized, 403 Forbidden, 404 NotFound, 409 Conflict, 422 UnprocessableEntity, 500 ServerError.
 
 Static factories: Ok(result), Created(result), NoContent(), BadRequest(message, details), NotFound(message, details), Unauthorized(message), Conflict(message), UnprocessableEntity(message), Error(message).
 
-Каждый хаб сам преобразует бизнес-ошибки; наличие enum не гарантирует точный status для каждого Failure. HubExceptionFilter возвращает Task.FromResult(errorResult) вместо объекта результата из InvokeMethodAsync; исключения вне локальных catch требуют исправления и проверки сериализации.
+Каждый хаб преобразует бизнес-ошибки; сверяйтесь с контрактом конкретной команды. HubExceptionFilter проверяет активную сессию перед вызовом и преобразует необработанные исключения в сериализуемый HubResult нужного типа. status 401 может завершить соединение.
 
 ## JSON-контракт
 
@@ -41,7 +42,5 @@ Static factories: Ok(result), Created(result), NoContent(), BadRequest(message, 
 
 HTTP MessageResponse.id и SignalR UserMessageResponse.messageId отличаются. HTTP и SignalR вложения также имеют разные структуры. Клиент должен иметь явное преобразование; не подменяйте один DTO другим.
 
----
-Проверено по исходникам на 03.10.2026, commit `4603be9`. Описано текущее поведение; сервер с БД и Firebase в рамках диагностики не запускался.
 
-Источник: [Govor.API/Common/Extensions/ResultExtensions.cs](https://github.com/Govor-team/Govor/blob/4603be9f714135e0af72d505d17f3d1709834bea/Govor.API/Common/Extensions/ResultExtensions.cs).
+Источник: [Govor.API/Common/Extensions/ResultExtensions.cs](https://github.com/stalcker2288969/Govor/blob/a3401ceedf30c2eb6167f7ef6e4ae820883d2de2/Govor.API/Common/Extensions/ResultExtensions.cs).

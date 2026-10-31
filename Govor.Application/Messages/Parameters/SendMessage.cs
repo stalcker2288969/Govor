@@ -9,4 +9,5 @@ public record SendMessage(
     RecipientType RecipientType,
     Guid FromUserId,
     DateTime SendAt, 
-    IEnumerable<SendMedia> Media);
+    IEnumerable<SendMedia> Media,
+    Guid? ForwardedFromMessageId = null);

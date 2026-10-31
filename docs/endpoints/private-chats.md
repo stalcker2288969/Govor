@@ -16,14 +16,12 @@
 }]
 ```
 
-При принятии заявки FriendRequestCommandService также создаёт личный чат и добавляет текущие соединения участников в SignalR-группу.
+При принятии заявки FriendRequestCommandService также создаёт личный чат. ChatsHub использует группы сессий; ручная подписка клиента на чат не требуется.
 
 Используйте chatId в Send.recipientId и в /api/user/{userId}/messages. Несмотря на имя параметра userId, загрузчик ожидает ID PrivateChat.
 
-Ошибки дружбы передаются через Forbid(ex.Message), что ошибочно трактует сообщение как имя схемы аутентификации и может дать 500. Параллельное создание и повторное присоединение после частичного сбоя требуют отдельной проверки.
+Отсутствие дружбы/доступа возвращает 403 без обещания тела ProblemDetails. Некорректный аргумент — 400. При последовательном вызове существующий чат возвращается повторно. Сервис сначала ищет пару, затем создаёт запись; полную гарантию идемпотентности при конкурентном создании этот маршрут не обещает.
 
----
-Проверено по исходникам на 03.10.2026, commit `4603be9`. Описано текущее поведение; успешная сборка не означает проверку работающего сервера.
 
-Источник: [Govor.API/Controllers/PrivateChatController.cs](https://github.com/Govor-team/Govor/blob/4603be9f714135e0af72d505d17f3d1709834bea/Govor.API/Controllers/PrivateChatController.cs).
+Источник: [Govor.API/Controllers/PrivateChatController.cs](https://github.com/stalcker2288969/Govor/blob/a3401ceedf30c2eb6167f7ef6e4ae820883d2de2/Govor.API/Controllers/PrivateChatController.cs).
 

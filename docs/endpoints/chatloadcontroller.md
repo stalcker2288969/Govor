@@ -26,19 +26,18 @@ Query: StartMessageId (Guid?, необязателен), Before=20, After=2. Bef
   "replyToMessageId":null,
   "mediaAttachments":[],
   "reactions":[],
+  "reactionsVersion":0,
   "messageViews":[]
 }]
 ```
 
 У HTTP-ответа поле id; у SignalR UserMessageResponse — messageId. Вложения HTTP имеют id, messageId, mediaFileId.
 
-## Известные проблемы
+## Доступ и пагинация
 
-Личный загрузчик принимает currentUser, но не проверяет участие в указанном чате. Это критичная ошибка доступа. Для группы участие проверяется; неучастнику возвращается [].
+Оба загрузчика проверяют доступ к конкретному чату: неучастник/заблокированный участник получает 403. Реакции, прочтения и вложения загружаются явно. Порядок стабилен по паре (SentAt, Id), включая одинаковое время отправки.
 
-Пагинация сравнивает только SentAt: сообщения с одинаковой датой могут выпадать вокруг якоря. Reactions и MessageViews не включаются явным Include, поэтому эти массивы не являются надёжным источником состояния. Нужны проверки доступа и стабильный курсор (SentAt, Id).
+Якорь включается в результат; при объединении страниц удаляйте дубли по id. Пустой массив может означать пустую историю или неизвестный якорь. encryptedContent возвращается как сохранённый конверт и расшифровывается клиентом.
 
----
-Проверено по исходникам на 03.10.2026, commit `4603be9`. Описано текущее поведение; успешная сборка не означает проверку работающего сервера.
 
-Источник: [Govor.Application/Messages/MessagesLoader.cs](https://github.com/Govor-team/Govor/blob/4603be9f714135e0af72d505d17f3d1709834bea/Govor.Application/Messages/MessagesLoader.cs).
+Источник: [Govor.Application/Messages/MessagesLoader.cs](https://github.com/stalcker2288969/Govor/blob/a3401ceedf30c2eb6167f7ef6e4ae820883d2de2/Govor.Application/Messages/MessagesLoader.cs).

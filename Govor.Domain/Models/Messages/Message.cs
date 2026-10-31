@@ -15,6 +15,10 @@ public class Message
     public List<MessageView> MessageViews { get; set; } = new List<MessageView>();
     
     public Guid? ReplyToMessageId { get; set; }
+    // Attribution is a snapshot: deleting the source must not delete the forwarded message.
+    public Guid? ForwardedFromMessageId { get; set; }
+    public Guid? ForwardedFromUserId { get; set; }
+    public DateTime? ForwardedFromSentAt { get; set; }
     public long ReactionsVersion { get; set; }
     
     public override bool Equals(object? obj)
@@ -29,7 +33,10 @@ public class Message
                SentAt == other.SentAt &&
                IsEdited == other.IsEdited &&
                EditedAt == other.EditedAt &&
-               ReplyToMessageId == other.ReplyToMessageId;
+               ReplyToMessageId == other.ReplyToMessageId &&
+               ForwardedFromMessageId == other.ForwardedFromMessageId &&
+               ForwardedFromUserId == other.ForwardedFromUserId &&
+               ForwardedFromSentAt == other.ForwardedFromSentAt;
     }
 }
 

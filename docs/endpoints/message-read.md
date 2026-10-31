@@ -1,6 +1,6 @@
 # Прочтение сообщений
 
-Контракт реализован в рабочей копии сервера от 03.10.2026. Требуются access token, роль User/Admin и участие именно в запрошенном чате. `chatId` — ID PrivateChat либо ChatGroup, а не ID собеседника. `recipientType`: 0 — личный чат, 1 — группа.
+Контракт текущей серверной ревизии из обзора. Требуются access token, роль User/Admin и участие именно в запрошенном чате. `chatId` — ID PrivateChat либо ChatGroup, а не ID собеседника. `recipientType`: 0 — личный чат, 1 — группа.
 
 ## POST /api/chats/{chatId}/read
 
